@@ -1,0 +1,25 @@
+#######################
+#  OpenStack Dev Tmp  #
+#######################
+
+OpenStack/SFC/basic_demo/*.pem
+OpenStack/SFC/basic_demo/*.txt
+
+###################
+#  Common Python  #
+###################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
