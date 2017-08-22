@@ -6,7 +6,7 @@ PIP_REQUIREMENTS = './requirements.txt'
 PIP_REQUIREMENTS_DEV = './dev_requirements.txt'
 
 # ignore virtualenv files
-PYTMP = $(shell find ./ -path './venv' -prune -o -name '*.pyc' -print)
+PYTMP = $(shell find ./ -path './venv' -prune -o -name '*.pyc' -o -name '__pycache__' -print)
 TMP = $(PYTMP)
 
 PYSRC = $(shell find ./ -name '*.py')

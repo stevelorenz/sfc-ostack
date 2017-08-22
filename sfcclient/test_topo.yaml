@@ -1,0 +1,172 @@
+#
+# About:
+#
+#   This is a HOT template for testing OpenStack networking-sfc extension
+#
+# Topo:
+#
+#   [           public           ]
+#                  |
+#                  |
+#              [rt_net1]
+#                  |
+#                  |
+#   [        net1/subnet1        ]
+#      |           |          |
+#      |           |          |
+#   src_vm --- chain_vm --- dst_vm
+#
+# Note:
+#
+#   Glance, FloatingIP are not officially supported
+#
+
+heat_template_version: 2017-02-24  # stable/ocata
+
+description: >
+  Simple template to test networking-sfc extension and sfcclient
+
+parameters:
+
+  image_name:
+    type: string
+    label: Image Name
+
+  flavor_name:
+    type: string
+    label: Instance Flavor
+
+  public_net:
+    type: string
+    description: >
+      ID or name of public network for which floating IP addresses will be allocated
+
+resources:
+
+  # --- Network ----
+
+  private_net:
+    type: OS::Neutron::Net
+    properties:
+      admin_state_up: True
+      name: net1
+      port_security_enabled: False
+      shared: True
+
+  private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: subnet1
+      network_id: { get_resource: private_net }
+      cidr: '10.0.0.0/24'
+      gateway_ip: '10.0.0.1'
+      dns_nameservers: ['141.30.1.1']
+
+  # --- Ports ----
+
+  src_vm_port:
+    type: OS::Neutron::Port
+    properties:
+      name: src_vm
+      network_id: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  dst_vm_port:
+    type: OS::Neutron::Port
+    properties:
+      name: dst_vm
+      network_id: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  chain_vm_port:
+    type: OS::Neutron::Port
+    properties:
+      name: chain_vm
+      network_id: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  chain_port_1:
+    type: OS::Neutron::Port
+    properties:
+      name: cp1
+      network_id: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  chain_port_2:
+    type: OS::Neutron::Port
+    properties:
+      name: cp2
+      network_id: { get_resource: private_net }
+      fixed_ips:
+        - subnet_id: { get_resource: private_subnet }
+
+  # --- Router ---
+
+  dft_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: public }
+
+  subnet1_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: dft_router }
+      subnet: { get_resource: private_subnet }
+
+  # --- Floating IP ---
+
+  src_vm_fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: public_net }
+      port_id: { get_resource: src_vm_port }
+
+  dst_vm_fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: public_net }
+      port_id: { get_resource: dst_vm_port }
+
+  chain_vm_fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: public_net }
+      port_id: { get_resource: chain_vm_port }
+
+  # --- Instance ----
+
+  src_vm:
+    type: OS::Nova::Server
+    properties:
+      name: src_vm
+      key_name: test
+      image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      networks:
+        - port: { get_resource:  src_vm_port }
+
+  dst_vm:
+    type: OS::Nova::Server
+    properties:
+      name: dst_vm
+      key_name: test
+      image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      networks:
+        - port: { get_resource: dst_vm_port }
+
+  chain_vm:
+    type: OS::Nova::Server
+    properties:
+      name: chain_vm
+      key_name: test
+      image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      networks:
+        - port: { get_resource: chain_vm_port }
+        - port: { get_resource: chain_port_1 }
+        - port: { get_resource: chain_port_2 }
