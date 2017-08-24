@@ -2,8 +2,8 @@
 #  OpenStack Dev Tmp  #
 #######################
 
-OpenStack/SFC/basic_demo/*.pem
-OpenStack/SFC/basic_demo/*.txt
+*.pem
+*.txt
 
 ###################
 #  Common Python  #

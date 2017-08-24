@@ -12,6 +12,7 @@ from __future__ import with_statement
 from re import search
 from time import sleep, strftime
 
+import conf
 from fabric.api import (cd, env, get, local, parallel, put, run, settings,
                         sudo, task)
 from fabric.context_managers import hide
@@ -24,13 +25,15 @@ def _get_instance_from_file():
     """Get SSH addrs of instances from a text file"""
     ins_lt = list()
     try:
-        with open('./remote_instance.txt') as rfile:
+        with open(conf.INS_ARGS['host_file']) as rfile:
             for ins_addr in rfile:
-                ins_lt.append(ins_addr.strip())
+                ins_lt.append('@'.join([conf.INS_ARGS['user_name'],
+                                        ins_addr.strip()])
+                              )
     except IOError:
-        pass
-
-    return ins_lt
+        raise RuntimeError('Can not find host info file.')
+    else:
+        return ins_lt
 # -----------------------------------------------
 
 
@@ -55,7 +58,7 @@ if not env.roles and not env.hosts:
     env.roles = ['instance']
 
 # use pem private key for SSH
-env.key_filename = './test.pem'
+env.key_filename = conf.SSH_KEY_ARGS['path']
 # -----------------------------------------------
 
 
@@ -65,8 +68,8 @@ env.key_filename = './test.pem'
 @parallel
 def upload_shared():
     """Upload shared files for all instances"""
-    # default copy to home dir
-    put('./instance_shared', '~/')
+    # MARK: default copy to home dir
+    put(conf.INS_ARGS['shared_folder'], '~/')
 
 
 if __name__ == "__main__":
@@ -80,6 +83,4 @@ def local_cleanup():
     print("### Clean all SSH known hosts...")
     local("rm -rf $HOME/.ssh/known_hosts")
     local("rm -rf $HOME/.ssh/known_hosts.old")
-    # print("### Clean all local pem private keys...")
-    # local("rm -f ./*.pem")
 # -----------------------------------------------

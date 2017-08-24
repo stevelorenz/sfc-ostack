@@ -4,6 +4,9 @@
 """
 About : A simple demo for testing networking-sfc extension
 
+        Use a flow classifier for all UDP traffics from src_vm to dst_vm with destination port = 9999
+        Simple sender and receiver can be found ./instance_shared/ or iperf can be used
+
 Topo  : Described in ./test_topo.yaml
 
 Email : xianglinks@gmail.com
@@ -13,7 +16,7 @@ import sys
 
 from openstack import connection
 
-import const
+import conf
 import sfcclient
 
 #################
@@ -24,7 +27,7 @@ import sfcclient
 def get_topo_info():
     """get_topo_info"""
     info = {}
-    conn = connection.Connection(**const.AUTH_ARGS)
+    conn = connection.Connection(**conf.AUTH_ARGS)
     src_vm_port = conn.network.find_port('src_vm')
     info['src_port_id'] = src_vm_port.id
     info['src_ip'] = list(conn.network.ips(port_id=src_vm_port.id))[0].fixed_ip_address
@@ -51,8 +54,9 @@ FLOW_CLSFR_ARGS = {
     'description': 'A test flow classifier for UDP traffic',
     'ethertype': 'IPv4',
     'protocol': 'UDP',
-    'source_port_range_min': 8888,
-    'source_port_range_max': 8888,
+    # MARK: for all source ports
+    'source_port_range_min': 0,
+    'source_port_range_max': 65535,
     'destination_port_range_min': 9999,
     'destination_port_range_max': 9999,
     'source_ip_prefix': TP_INFO['src_ip'] + '/32',
@@ -63,21 +67,21 @@ FLOW_CLSFR_ARGS = {
 
 
 def create_flow_classifier():
-    sfc_clt = sfcclient.SFCClient(const.AUTH_ARGS)
+    sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
     print('# Create the flow classifier.')
     sfc_clt.create('flow_classifier', FLOW_CLSFR_ARGS)
     print(sfc_clt.list('flow_classifier'))
 
 
 def delete_flow_classifier():
-    sfc_clt = sfcclient.SFCClient(const.AUTH_ARGS)
+    sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
     print('# Delete the flow classifier.')
     sfc_clt.delete('flow_classifier', FLOW_CLSFR_ARGS['name'])
     print(sfc_clt.list('flow_classifier'))
 
 
 def create_port_chain():
-    sfc_clt = sfcclient.SFCClient(const.AUTH_ARGS)
+    sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
 
     PP_ARGS = {
         'name': 'test_pp',
@@ -112,7 +116,7 @@ def create_port_chain():
 
 
 def delete_port_chain():
-    sfc_clt = sfcclient.SFCClient(const.AUTH_ARGS)
+    sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
 
     print('# Delete the port pair.')
     sfc_clt.delete('port_pair', 'test_pp')

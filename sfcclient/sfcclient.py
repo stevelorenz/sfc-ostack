@@ -10,6 +10,14 @@ Note  :
     1. Only support keystone v3 identity API.
     2. This module is developed relative hurried, many improvements are needed.
 
+Usage :
+
+    import sfcclient
+    # create and get a new flow classifier
+    sfc_clt = sfcclient(**AUTH_ARGS)
+    sfc_clt.create('flow_classifier', FL_CLSFR_ARGS)
+    fl_clsfr = sfc_clt.find(FL_CLSFR_ARGS['name'])
+
 Ref   :
         1. openstack/python-keystoneclient
 
