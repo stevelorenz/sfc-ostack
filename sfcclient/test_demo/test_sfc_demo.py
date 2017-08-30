@@ -5,43 +5,21 @@
 About : A simple demo for testing networking-sfc extension
 
         Use a flow classifier for all UDP traffics from src_vm to dst_vm with destination port = 9999
-        Simple sender and receiver can be found ./instance_shared/ or iperf can be used
+        Simple UDP sender and receiver can be found ./instance_shared/ or iperf can be used
 
-Topo  : Described in ./test_topo.yaml
+Topo  : Described in ./test_topo.yaml (HEAT Template)
 
 Email : xianglinks@gmail.com
 """
 
+import json
 import sys
 
 from openstack import connection
 
 import conf
 import sfcclient
-
-#################
-#  Helper Func  #
-#################
-
-
-def get_topo_info():
-    """get_topo_info"""
-    info = {}
-    conn = connection.Connection(**conf.AUTH_ARGS)
-    src_vm_port = conn.network.find_port('src_vm')
-    info['src_port_id'] = src_vm_port.id
-    info['src_ip'] = list(conn.network.ips(port_id=src_vm_port.id))[0].fixed_ip_address
-    dst_vm_port = conn.network.find_port('dst_vm')
-    info['dst_port_id'] = dst_vm_port.id
-    info['dst_ip'] = list(conn.network.ips(port_id=dst_vm_port.id))[0].fixed_ip_address
-
-    igs_port = conn.network.find_port('cp1')
-    info['igs_port_id'] = igs_port.id
-    egs_port = conn.network.find_port('cp2')
-    info['egs_port_id'] = egs_port.id
-
-    return info
-
+from post_build_topo import get_topo_info
 
 ################
 #  Parameters  #
@@ -61,8 +39,8 @@ FLOW_CLSFR_ARGS = {
     'destination_port_range_max': 9999,
     'source_ip_prefix': TP_INFO['src_ip'] + '/32',
     'destination_ip_prefix': TP_INFO['dst_ip'] + '/32',
-    'logical_source_port': TP_INFO['src_port_id'],
-    'logical_destination_port': TP_INFO['dst_port_id']
+    'logical_source_port': TP_INFO['src_pt_id'],
+    'logical_destination_port': TP_INFO['dst_pt_id']
 }
 
 
@@ -70,6 +48,7 @@ def create_flow_classifier():
     sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
     print('# Create the flow classifier.')
     sfc_clt.create('flow_classifier', FLOW_CLSFR_ARGS)
+    print('# List of flow classifier:')
     print(sfc_clt.list('flow_classifier'))
 
 
@@ -77,7 +56,54 @@ def delete_flow_classifier():
     sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
     print('# Delete the flow classifier.')
     sfc_clt.delete('flow_classifier', FLOW_CLSFR_ARGS['name'])
+    print('# List of flow classifier:')
     print(sfc_clt.list('flow_classifier'))
+
+
+def create_pc_linear():
+    """Create a linear port chain"""
+    sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
+    for chn_id in range(1, 4):
+        PP_ARGS = {
+            'name': 'pp_%d' % chn_id,
+            'description': 'Port pair for chain_ins %d' % chn_id,
+            'ingress': TP_INFO['chn%d_pt_in_id' % chn_id],
+            'egress': TP_INFO['chn%d_pt_out_id' % chn_id]
+        }
+        print('# Create the port pair.')
+        sfc_clt.create('port_pair', PP_ARGS)
+
+        print('# Create the port pair group.')
+        pp_id = sfc_clt.get_id('port_pair', 'pp_%d' % chn_id)
+        PP_GRP_ARGS = {
+            'name': 'pp_grp_%d' % chn_id,
+            'description': 'Port pair group for chain_ins %d' % chn_id,
+            'port_pairs': [pp_id]
+        }
+        print('# Create the port pair group.')
+        sfc_clt.create('port_pair_group', PP_GRP_ARGS)
+
+    print('# List of port pairs:')
+    print(sfc_clt.list('port_pair'))
+    print('# List of port pair groups:')
+    print(sfc_clt.list('port_pair_group'))
+
+    print('# Create the port chain...')
+    pp_grp_lst = list()
+    for chn_id in range(1, 4):
+        pp_grp_lst.append(
+            sfc_clt.get_id('port_pair_group', 'pp_grp_%d' % chn_id)
+        )
+
+    fc_id = sfc_clt.get_id('flow_classifier', 'test_fc')
+    PC_ARGS = {
+        'name': 'test_pc',
+        'description': 'A test port chain',
+        'port_pair_groups': pp_grp_lst,
+        'flow_classifiers': [fc_id]
+    }
+    sfc_clt.create('port_chain', PC_ARGS)
+    print(sfc_clt.list('port_chain'))
 
 
 def create_port_chain():
@@ -108,31 +134,31 @@ def create_port_chain():
     PC_ARGS = {
         'name': 'test_pc',
         'description': 'A test port chain',
-        'port_pair_groups': [pp_grp_id],
+        'port_pair_groups': pp_grp_lst,
         'flow_classifiers': [fc_id]
     }
     sfc_clt.create('port_chain', PC_ARGS)
+    print('# List of port chain:')
     print(sfc_clt.list('port_chain'))
 
 
 def delete_port_chain():
     sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
 
-    print('# Delete the port pair.')
-    sfc_clt.delete('port_pair', 'test_pp')
-    print(sfc_clt.list('port_pair'))
+    print('# Delete all port pairs.')
+    for pp in sfc_clt.list('port_pair'):
+        sfc_clt.delete('port_pair', pp['name'])
 
-    print('# Delete the port pair group.')
-    sfc_clt.delete('port_pair_group', 'test_pp_grp')
-    print(sfc_clt.list('port_pair_group'))
+    print('# Delete all port pair groups.')
+    for pp_grp in sfc_clt.list('port_pair_group'):
+        sfc_clt.delete('port_pair_group', pp_grp['name'])
 
-    print('# Delete the port chain.')
-    sfc_clt.delete('port_chain', 'test_pc')
-    print(sfc_clt.list('port_chain'))
+    print('# Delete all port chains.')
+    for pc in sfc_clt.list('port_chain'):
+        sfc_clt.delete('port_chain', pc['name'])
 
 
 if __name__ == "__main__":
-    # build_port_chain()
     if len(sys.argv) == 1:
         raise RuntimeError('Unknown operation. Use -c for creation and -d for breaking the port chain.')
     elif sys.argv[1] == '-fc':
@@ -141,9 +167,9 @@ if __name__ == "__main__":
     elif sys.argv[1] == '-fd':
         print('Delete the flow classifier...')
         delete_flow_classifier()
-    elif sys.argv[1] == '-pc':
+    elif sys.argv[1] == '-pcl':
         print('Create the port chain...')
-        create_port_chain()
+        create_pc_linear()
     elif sys.argv[1] == '-pd':
         print('Delete the port chain...')
         delete_port_chain()

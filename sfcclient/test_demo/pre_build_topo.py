@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 """
-About : Pre-steps before building the test topology, including creation of
-a ubuntu-cloud image, a key-pair and a security group.
+About : Pre-steps before building the test topology
+        Including creation of a ubuntu-cloud image, a key-pair and a security group.
 
 Email : xianglinks@gmail.com
 """

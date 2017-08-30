@@ -11,7 +11,6 @@ from heatclient import client
 from keystoneauth1 import loading, session
 from openstack import connection
 
-
 import conf
 
 
@@ -29,10 +28,14 @@ HEAT_TPL = conf.HEAT_ARGS['tpl_path']
 
 # Template input parameters
 PARAMETERS = {
-    'public_net': _get_public_net(),
-    # Name of image for instances
+    'pub_net': _get_public_net(),
     'image_name': conf.IMAGE_ARGS['name'],
-    # Name of flavor
+    'pvt_net_name': conf.NET_ARGS['pvt_net_name'],
+    'pvt_subnet_name': conf.NET_ARGS['pvt_subnet_name'],
+    'pvt_subnet_cidr': conf.NET_ARGS['pvt_subnet_cidr'],
+    'pvt_subnet_gw': conf.NET_ARGS['pvt_subnet_gw'],
+    'pvt_subnet_dns': conf.NET_ARGS['pvt_subnet_dns'],
+    'key_name': conf.SSH_KEY_ARGS['name'],
     'flavor_name': conf.INS_ARGS['flavor']['name']
 }
 

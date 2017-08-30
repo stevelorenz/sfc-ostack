@@ -20,7 +20,7 @@ sys.path.insert(0, '../')
 
 # Arguments for authentication
 AUTH_ARGS = {
-    'auth_url': 'http://192.168.0.194/identity/v3',
+    'auth_url': 'http://192.168.100.1/identity/v3',
     'project_name': 'admin',
     'user_domain_name': 'default',
     'project_domain_name': 'default',
@@ -50,6 +50,18 @@ HEAT_ARGS = {
     'stack_name': 'sfc-test',
     'format': 'HOT',
     'tpl_path': './test_topo.yaml'
+}
+
+####################
+#  Network Config  #
+####################
+
+NET_ARGS = {
+    'pvt_net_name': 'net1',
+    'pvt_subnet_name': 'subnet1',
+    'pvt_subnet_cidr': '10.0.0.0/24',
+    'pvt_subnet_gw': '10.0.0.1',
+    'pvt_subnet_dns': '141.30.1.1'
 }
 
 #####################
