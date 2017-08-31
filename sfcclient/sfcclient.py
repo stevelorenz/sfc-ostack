@@ -10,21 +10,17 @@ Note  :
     1. Only support keystone v3 identity API.
     2. This module is developed relative hurried, many improvements are needed.
 
-Usage :
-
-    import sfcclient
-    # create and get a new flow classifier
-    sfc_clt = sfcclient(**AUTH_ARGS)
-    sfc_clt.create('flow_classifier', FL_CLSFR_ARGS)
-    fl_clsfr = sfc_clt.find(FL_CLSFR_ARGS['name'])
+Usage : Check the ./example.py
 
 Ref   :
         1. openstack/python-keystoneclient
+        2. openstack/networking-sfc
 
 Email : xianglinks@gmail.com
 """
 
 import logging
+import time
 from collections import namedtuple
 
 from keystoneauth1 import adapter, session
@@ -35,13 +31,18 @@ from keystoneauth1.identity import v3
 #  Logging  #
 #############
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-stream_handler = logging.StreamHandler()
-dft_fmt = logging.Formatter(
-    '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-stream_handler.setFormatter(dft_fmt)
-logger.addHandler(stream_handler)
+
+def _get_logger():
+    """_get_logger"""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    fmt = logging.Formatter(
+        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(fmt)
+    logger.addHandler(stream_handler)
+    return logger
+
 
 ###########
 #  CONST  #
@@ -49,13 +50,18 @@ logger.addHandler(stream_handler)
 
 NEUTRON_API_VERSION = 'v2.0'
 
+
 ################
 #  Exceptions  #
 ################
 
-
 class SFCClientException(Exception):
     """The exception class for SFCClient"""
+    pass
+
+
+class RscOptTimeout(SFCClientException):
+    """A resource operation is timeout"""
     pass
 
 
@@ -63,7 +69,7 @@ class SFCClientException(Exception):
 #  REST Client  #
 #################
 
-rsc_para = namedtuple('Resource_Parameter', ['url', 'name', 'plural_name'])
+RscPara = namedtuple('Resource_Parameter', ['url', 'name', 'plural_name'])
 
 
 class SFCClient(object):
@@ -72,24 +78,28 @@ class SFCClient(object):
     # A dict of SFC resource parameters
     rsc_dict = {
         'flow_classifier':
-        rsc_para('/sfc/flow_classifiers', 'flow_classifier',
-                 'flow_classifiers'),
+        RscPara('/sfc/flow_classifiers', 'flow_classifier',
+                'flow_classifiers'),
         'port_pair':
-        rsc_para('/sfc/port_pairs', 'port_pair', 'port_pairs'),
+        RscPara('/sfc/port_pairs', 'port_pair', 'port_pairs'),
         'port_pair_group':
-        rsc_para('/sfc/port_pair_groups', 'port_pair_group',
-                 'port_pair_groups'),
+        RscPara('/sfc/port_pair_groups', 'port_pair_group',
+                'port_pair_groups'),
         'port_chain':
-        rsc_para('/sfc/port_chains', 'port_chain', 'port_chains')
+        RscPara('/sfc/port_chains', 'port_chain', 'port_chains')
     }
     rsc_tuple = tuple(rsc_dict.keys())
 
-    def __init__(self, auth_args):
+    def __init__(self, auth_args, logger=None):
         """Initialization of SFCClient object
 
         :param auth_args (dict): A dict of essential arguments for Keystone authentication
+        :param logger(logging.Logger): Logger object
         """
         self.auth_args = auth_args
+        if not logger:
+            logger = _get_logger()
+        self.logger = logger
         sess = self._construct_session()
         adap_args = {
             'user_agent': 'python-sfcclient',
@@ -119,30 +129,35 @@ class SFCClient(object):
         :param url: Request URL
         """
         try:
-            logger.debug('Request URL: %s', url)
-            logger.debug('Request Method: %s', method)
+            self.logger.debug('Request URL: %s', url)
+            self.logger.debug('Request Method: %s', method)
             method_to_call = getattr(self._httpclient, method.lower(), None)
             if not method_to_call:
                 raise SFCClientException('Invalid request method: %s' % method)
             resp = method_to_call(url, **kargs)
         except ks_clt_excp as excp:
-            logger.error('Error Response:')
-            logger.error(excp.response.json())
+            self.logger.error('Error Response:')
+            self.logger.error(excp.response.json())
         else:
             return resp
 
     # --- CRUD Operations ---
-    # MARK: Based on item name of a resource instead of the ID
+
+    # Each item is described as a dictionary of fields, like name, id, description etc.
+    # Check REST API Ref for details
 
     def list(self, rsc_name):
         """List all items of a resource
 
         :param rsc_name (str): Name of the resource
+        :retype: list
         """
         rsc_para = self.rsc_dict[rsc_name]
         resp = self._send_request('GET', rsc_para.url)
         item_lst = resp.json()[rsc_para.plural_name]
         return item_lst
+
+    # MARK: Based on item name of a resource instead of the ID
 
     def find(self, rsc_name, item_name, ignore_missing=True):
         """Find a resource item with given name
@@ -150,6 +165,7 @@ class SFCClient(object):
         :param item_name (str): Name of a specified item of a resource with rsc_name
         :param ignore_missing (Bool): If True, None is returned if the item is not found.
                                       Otherwise, the BaseSFCClientException is raised.
+        :retype: dict
         """
         for item in self.list(rsc_name):
             if item['name'] == item_name:
@@ -182,3 +198,27 @@ class SFCClient(object):
         """
         item = self.find(rsc_name, item_name, ignore_missing=False)
         return item['id']
+
+    def wait(self, rsc_name, item_name, opt, interval, timeout):
+        """Wait for finishing a operation for a resource item
+
+        :param opt (str): Operation, can be 'create' or 'delete'
+        :param interval (float): Number of seconds to wait between checks
+        :param timeout (float): Maximum number of seconds to wait for operation
+        """
+        total_wait = 0
+        while total_wait < timeout:
+            rsc = self.find(rsc_name, item_name)
+            if opt == 'create':
+                if not rsc:
+                    time.sleep(interval)
+                    total_wait += interval
+            if opt == 'delete':
+                if rsc:
+                    time.sleep(interval)
+                    total_wait += interval
+            else:
+                raise RuntimeError('Unknown operation: %s' % opt)
+
+        msg = "Timeout waiting for %s operation on %s with name: %s" % (opt, rsc_name, item_name)
+        raise RscOptTimeout(msg)

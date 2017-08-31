@@ -1,12 +1,12 @@
 #!/bin/bash
-# About: Use OVS for chained-interface forwarding
-# Email: xianglinks@gmail.com
-
-BG_NAME='br0'
+# About : Use OVS for interface forwarding
+# Email : xianglinks@gmail.com
 
 ##############
 #  Iterface  #
 ##############
+
+BG_NAME='br0'
 
 # ingress and egress ifce
 IG_IFCE='eth1'
@@ -22,8 +22,6 @@ echo "## MAC of the egress interface: $EG_IFCE_MAC"
 #########
 #  OVS  #
 #########
-
-# Run OVS in kernel mod
 
 # Create a bridge
 sudo ovs-vsctl add-br "$BG_NAME"
@@ -41,6 +39,6 @@ sudo ovs-ofctl mod-port "$BG_NAME" 2 no-flood
 #sudo ovs-ofctl add-flow "$BG_NAME" "in_port=1 actions=output:2"
 
 # modify the source and destination MAC address
-#sudo ovs-ofctl add-flow "$BG_NAME" "in_port=1 actions=output:2,mod_dl_src:$IG_IFCE_MAC,mod_dl_dst:$EG_IFCE_MAC"
+#sudo ovs-ofctl add-flow "$BG_NAME" "in_port=1 actions=mod_dl_src:$IG_IFCE_MAC,mod_dl_dst:$EG_IFCE_MAC,output:2"
 
-echo "# OVS with port forwarding is setup."
+echo "# OVS with iterface forwarding is setup."

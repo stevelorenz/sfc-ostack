@@ -14,6 +14,12 @@
 #   Private Net: [ net/subnet ]
 #       |
 #       |
+#   1. Linear without Port Pair Group
+#
+#   src --- chn1 --- chn2 ---chn3 --- dst
+#
+#   2. With Port Pair Group for Load Blancing
+#
 #           ------
 #           |chn2|
 #   src --- |chn1| --- chn3 --- dst
@@ -22,7 +28,6 @@
 # Note:
 #
 #   FloatingIP are not officially supported
-#
 
 heat_template_version: 2017-02-24  # stable/ocata
 

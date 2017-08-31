@@ -12,8 +12,8 @@ Topo  : Described in ./test_topo.yaml (HEAT Template)
 Email : xianglinks@gmail.com
 """
 
-import json
 import sys
+import time
 
 from openstack import connection
 
@@ -28,8 +28,8 @@ from post_build_topo import get_topo_info
 TP_INFO = get_topo_info()
 
 FLOW_CLSFR_ARGS = {
-    'name': 'test_fc',
-    'description': 'A test flow classifier for UDP traffic',
+    'name': 'udp_dst_9999',
+    'description': 'BlaBlaBla...',
     'ethertype': 'IPv4',
     'protocol': 'UDP',
     # MARK: for all source ports
@@ -37,6 +37,7 @@ FLOW_CLSFR_ARGS = {
     'source_port_range_max': 65535,
     'destination_port_range_min': 9999,
     'destination_port_range_max': 9999,
+    # MARK: Should use CIDR format
     'source_ip_prefix': TP_INFO['src_ip'] + '/32',
     'destination_ip_prefix': TP_INFO['dst_ip'] + '/32',
     'logical_source_port': TP_INFO['src_pt_id'],
@@ -61,7 +62,10 @@ def delete_flow_classifier():
 
 
 def create_pc_linear():
-    """Create a linear port chain"""
+    """Create a linear port chain
+
+    Topo: src --- chn1 --- chn2 ---chn3 --- dst
+    """
     sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
     for chn_id in range(1, 4):
         PP_ARGS = {
@@ -80,6 +84,7 @@ def create_pc_linear():
             'description': 'Port pair group for chain_ins %d' % chn_id,
             'port_pairs': [pp_id]
         }
+        time.sleep(1)
         print('# Create the port pair group.')
         sfc_clt.create('port_pair_group', PP_GRP_ARGS)
 
@@ -95,7 +100,7 @@ def create_pc_linear():
             sfc_clt.get_id('port_pair_group', 'pp_grp_%d' % chn_id)
         )
 
-    fc_id = sfc_clt.get_id('flow_classifier', 'test_fc')
+    fc_id = sfc_clt.get_id('flow_classifier', 'udp_dst_9999')
     PC_ARGS = {
         'name': 'test_pc',
         'description': 'A test port chain',
@@ -103,59 +108,26 @@ def create_pc_linear():
         'flow_classifiers': [fc_id]
     }
     sfc_clt.create('port_chain', PC_ARGS)
-    print(sfc_clt.list('port_chain'))
-
-
-def create_port_chain():
-    sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
-
-    PP_ARGS = {
-        'name': 'test_pp',
-        'description': 'A test port pair for chain_vm',
-        'ingress': TP_INFO['igs_port_id'],
-        'egress': TP_INFO['egs_port_id']
-    }
-    print('# Create the port pair.')
-    sfc_clt.create('port_pair', PP_ARGS)
-    print(sfc_clt.list('port_pair'))
-
-    pp_id = sfc_clt.get_id('port_pair', 'test_pp')
-    PP_GRP_ARGS = {
-        'name': 'test_pp_grp',
-        'description': 'A test port pair group for chain_vm',
-        'port_pairs': [pp_id]
-    }
-    print('# Create the port pair group.')
-    sfc_clt.create('port_pair_group', PP_GRP_ARGS)
-    print(sfc_clt.list('port_pair_group'))
-
-    pp_grp_id = sfc_clt.get_id('port_pair_group', 'test_pp_grp')
-    fc_id = sfc_clt.get_id('flow_classifier', 'test_fc')
-    PC_ARGS = {
-        'name': 'test_pc',
-        'description': 'A test port chain',
-        'port_pair_groups': pp_grp_lst,
-        'flow_classifiers': [fc_id]
-    }
-    sfc_clt.create('port_chain', PC_ARGS)
-    print('# List of port chain:')
     print(sfc_clt.list('port_chain'))
 
 
 def delete_port_chain():
     sfc_clt = sfcclient.SFCClient(conf.AUTH_ARGS)
 
+    print('# Delete all port chains.')
+    for pc in sfc_clt.list('port_chain'):
+        sfc_clt.delete('port_chain', pc['name'])
+    time.sleep(1)
+
     print('# Delete all port pairs.')
     for pp in sfc_clt.list('port_pair'):
         sfc_clt.delete('port_pair', pp['name'])
+    time.sleep(1)
 
     print('# Delete all port pair groups.')
     for pp_grp in sfc_clt.list('port_pair_group'):
         sfc_clt.delete('port_pair_group', pp_grp['name'])
-
-    print('# Delete all port chains.')
-    for pc in sfc_clt.list('port_chain'):
-        sfc_clt.delete('port_chain', pc['name'])
+    time.sleep(1)
 
 
 if __name__ == "__main__":
@@ -168,7 +140,7 @@ if __name__ == "__main__":
         print('Delete the flow classifier...')
         delete_flow_classifier()
     elif sys.argv[1] == '-pcl':
-        print('Create the port chain...')
+        print('Create the port chain with linear topology...')
         create_pc_linear()
     elif sys.argv[1] == '-pd':
         print('Delete the port chain...')
