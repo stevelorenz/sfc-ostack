@@ -1,0 +1,86 @@
+#
+# About  : Example config file of ostacksfc
+# Format : YAML
+#
+# Email  : xianglinks@gmail.com
+#
+
+---
+
+log:
+# logging configs
+  level: INFO
+
+###########
+#  Cloud  #
+###########
+cloud:
+
+  auth:
+  # Authentication parameters
+    auth_url: http://192.168.100.1/identity/v3
+    project_name: admin
+    project_domain_name: default
+    # Domain names are needed for V3
+    username: admin
+    user_domain_name: default
+    password: stack
+
+###############################
+#  Service Function Chaining  #
+###############################
+SFC:
+
+  flow_classifier:
+  # Rules for flows that will be routed into the function chain
+    udp_dst_9999:
+    # Name of the flow classifier
+      description: BlaBlaBla...
+      ethertype: IPv4
+      # L2 ethertype. Can be IPv4 or IPv6 only.
+      protocol: UDP
+      source_port_range_min: 0
+      source_port_range_max: 65535
+      destination_port_range_min: 9999
+      destination_port_range_max: 9999
+      source_ip_prefix: 10.0.0.1/32
+      # Source IPv4 or IPv6 prefix, as CIDR
+      destination_ip_prefix: 10.0.0.3/32
+      logical_source_port: 5ce5d533-a599-4a44-83a8-5fcf5d4ad3c5
+      # ID of the source neutron port
+      logical_destination_port: 52891f9a-3933-42d5-bb56-9586e68c404e
+      # ID of the destination neutron port
+
+  network:
+    net_name: net1
+    subnet_name: subnet1
+    security_group: test
+
+  # Servers for function chaining
+  server:
+    # Name of the server
+    chn1:
+      # Sequence number in the chain
+      seq_num: 1
+      image: ubuntu-cloud
+      flavor: m.test
+      ssh:
+      # SSH configs
+        user_name: ubuntu
+        pub_key_name: test
+        # Path of private key file
+        pvt_key_file: ./test.pem
+
+    chn2:
+      seq_num: 2
+      image: ubuntu-cloud
+      flavor: m.test
+      ssh:
+        user_name: ubuntu
+        pub_key_name: test
+        pvt_key_file: ./test.pem
+
+  chain:
+    name: udp_dst_9999
+
+...

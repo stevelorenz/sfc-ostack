@@ -1,0 +1,129 @@
+#
+# About:
+#
+#   A HOT template for testing sfc-ostack
+#
+# Topo:
+#
+#   Public Net: [ public ]
+#       |
+#       |
+#   { Router }
+#       |
+#       |
+#   Private Net: [ net/subnet ]
+#       |
+#       |
+#   server_vm
+#
+# Note:
+#
+#   FloatingIP are not officially supported
+
+heat_template_version: 2017-02-24  # stable/ocata
+
+description: Test sfc-ostack
+
+parameters:
+
+  image_name:
+    type: string
+    label: image name
+
+  flavor_name:
+    type: string
+    label: instance flavor name
+
+  key_name:
+    type: string
+    label: SSH key pair name
+
+  pub_net:
+    type: string
+    label: public network
+    description: >
+      ID or name of public network for which floating IP addresses will be allocated
+
+  pvt_net_name:
+    type: string
+    label: Private Network Name
+
+  pvt_subnet_name:
+    type: string
+    label: Private Subnetwork Name
+
+  pvt_subnet_cidr:
+    type: string
+    label: CIDR for subnet
+
+  pvt_subnet_gw:
+    type: string
+    label: Gateway for subnet
+
+  pvt_subnet_dns:
+    type: comma_delimited_list
+    label: DNS servers
+
+resources:
+
+  # --- Network ----
+
+  pvt_net:
+    type: OS::Neutron::Net
+    properties:
+      admin_state_up: True
+      name: { get_param: pvt_net_name }
+      port_security_enabled: True
+      shared: True
+
+  pvt_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: { get_param: pvt_subnet_name }
+      network_id: { get_resource: pvt_net }
+      cidr: { get_param: pvt_subnet_cidr }
+      gateway_ip: { get_param: pvt_subnet_gw }
+      dns_nameservers: { get_param: pvt_subnet_dns }
+
+  # --- Ports ----
+
+  dst_pt:
+    type: OS::Neutron::Port
+    properties:
+      name: dst_pt
+      network_id: { get_resource: pvt_net }
+      fixed_ips:
+        - subnet_id: { get_resource: pvt_subnet }
+
+  # --- Router ---
+
+  dft_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: public }
+
+  subnet1_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: dft_router }
+      subnet: { get_resource: pvt_subnet }
+
+  # --- Floating IP ---
+
+  dst_fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: pub_net }
+      port_id: { get_resource: dst_pt }
+
+  # --- Instance ----
+
+  dst:
+    type: OS::Nova::Server
+    properties:
+      name: dst
+      key_name: { get_param: key_name }
+      image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      networks:
+        - port: { get_resource: dst_pt }
