@@ -58,6 +58,7 @@ SFC:
     chn1:
       # Sequence number in the chain
       seq_num: 1
+      ifce: [eth1, eth2]
       image: ubuntu-cloud
       flavor: m.test
       ssh:
@@ -68,6 +69,7 @@ SFC:
         pvt_key_file: ./test.pem
     chn2:
       seq_num: 2
+      ifce: [eth1, eth2]
       image: ubuntu-cloud
       flavor: m.test
       ssh:

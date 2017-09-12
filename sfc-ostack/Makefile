@@ -1,5 +1,6 @@
 #
-# Makefile
+# About: Makefile for sfc-ostack project
+# Email: xianglinks@gmail.com
 #
 
 PIP_REQUIREMENTS = './requirements.txt'
@@ -10,8 +11,13 @@ TMP = $(PYTMP)
 
 PYSRC = $(shell find ./ -path './venv' -prune -o -name '*.py' -print)
 
+LOCAL_HOST="stack@127.0.0.1"
+# local github repo
+LOCAL_GH="/opt/stack/dev_project/comnet-playground/OpenStack/SFC/sfc-ostack"
+# local bitbucket repo
+LOCAL_BB="/opt/stack/dev_project/sfc-openstack"
+
 TEST_SERVER="zuo@192.168.157.81"
-LOCAL_LOC="../sfc-ostack"
 REMOTE_LOC="~/"
 
 all:
@@ -21,17 +27,28 @@ all:
 lint-src:
 	@echo "Lint all python src..."
 	# Ignore some format issues
-	flake8 --exclude ./venv --ignore=E501,E402 $(PYSRC)
+	flake8 --exclude ./venv --ignore=E501,F401,E402 $(PYSRC)
+
+format-src:
+	@echo "Format all python src with autopep8..."
+	autopep8 -i $(PYSRC)
 
 clean-tmp:
 	@echo "Run cleanups..."
 	echo $(TMP)
 	@rm -rf $(TMP)
 
-# MARK: For testing on a OpenStack ENV
+sync-bitbucket-local:
+	@echo "Sync codes to local bitbucket repo..."
+	rsync -rav --exclude="venv" --delete $(LOCAL_GH) $(LOCAL_HOST):$(LOCAL_BB)
+
+sync-github-local:
+	@echo "Sync codes to local github repo..."
+	rsync -rav --exclude="venv" --delete $(LOCAL_BB) $(LOCAL_HOST):$(LOCAL_GH)
+
 upload-test-server:
-	@echo "Upload to the server: $(TEST_SERVER)"
-	rsync -rav -e ssh --exclude="venv" $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
+	@echo "Upload to the test server: $(TEST_SERVER)"
+	rsync -rav -e ssh --exclude="venv" --delete $(LOCAL_GH) $(TEST_SERVER):$(REMOTE_LOC)
 
 save_pkgs:
 	@echo "Save installed pip packages in $(PIP_REQUIREMENTS)"

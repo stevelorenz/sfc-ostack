@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 
@@ -22,11 +22,14 @@ class SFCMgrError(Exception):
     pass
 
 
+class ConfInsError(SFCMgrError):
+    """Error while configuring instances"""
+    pass
+
+
 class SFCMgr(object):
 
-    """SFC Resource Manager
-
-    """
+    """SFC Manager"""
 
     def __init__(self, conf_hd):
         """Init a SFC Manager"""
@@ -37,25 +40,36 @@ class SFCMgr(object):
         self.conn = connection.Connection(**auth_args)
         self.sfcclient = sfcclient.SFCClient(auth_args, self.logger)
 
+    ################
+    #  Help Funcs  #
+    ################
+
     def _get_pid(self, name):
+        """Get ID of the port with given name"""
         port = self.conn.network.find_port(name)
         return port.id
 
-    def _create_port(self, srv):
-        """Create to be chained neutron ports
+    ###################
+    #  Resource CRUD  #
+    ###################
 
-        :param: srv (dict)
+    def _create_neutron_pp(self, srv_name):
+        """Create to be chained neutron port pairs
+
+        Port name pattern:
+            ingress: srv_name_in egress: srv_name_out
+
         :retype: tuple
         """
         pp = list()
-        self.logger.info('Create ingress and egress ports for server: %s...' % srv['name'])
+        self.logger.info(
+            'Create ingress and egress ports for server: %s...' % srv['name'])
         net_conf = self.conf_hd.get_sfc_net()
         net = self.conn.network.find_network(net_conf['net_name'])
-        base = srv['name']
         for suf in ('_in', '_out'):
             # MARK: subnet_id is not supported
             pt_args = {
-                'name': base + suf,
+                'name': ''.join((srv['name'], suf)),
                 'network_id': net.id
             }
             self.logger.debug('Create port %s on %s'
@@ -74,7 +88,8 @@ class SFCMgr(object):
         # Used to associate floating IPs
         pub = self.conn.network.find_network('public')
         net = self.conn.network.find_network(net_conf['net_name'])
-        sec_grp = self.conn.network.find_security_group(net_conf['security_group'])
+        sec_grp = self.conn.network.find_security_group(
+            net_conf['security_group'])
         srv_args = {
             'name': srv['name'],
             'image_id': self.conn.compute.find_image(srv['image']).id,
@@ -85,7 +100,8 @@ class SFCMgr(object):
         }
         srv_ins = self.conn.compute.create_server(**srv_args)
         # Wait until the server is active, maximal 5 min
-        srv_ins = self.conn.compute.wait_for_server(srv_ins, status='ACTIVE', wait=300)
+        srv_ins = self.conn.compute.wait_for_server(
+            srv_ins, status='ACTIVE', wait=300)
         # Add a security group
         self.conn.compute.add_security_group_to_server(srv_ins.id, sec_grp.id)
         # Add a floating IP, the instance SHOULD only has one interface now
@@ -179,7 +195,8 @@ class SFCMgr(object):
                 'port_pairs': [pp_id]
             }
             self.sfcclient.create('port_pair_group', pp_grp_args)
-            pp_grp_id = self.sfcclient.find('port_pair_group', pp_grp_args['name'])
+            pp_grp_id = self.sfcclient.find(
+                'port_pair_group', pp_grp_args['name'])
             pp_grp_lst.append(pp_grp_id)
 
         # 2. Create the port chain
@@ -203,7 +220,7 @@ class SFCMgr(object):
         srv_lst = self.conf_hd.get_sfc_server()
         pp_lst = list()
         for srv in srv_lst:
-            pp_lst.append(self._create_port(srv))
+            pp_lst.append(self._create_neutron_pp(srv))
             time.sleep(1)
             self._create_server(srv)
             time.sleep(1)
@@ -225,8 +242,11 @@ class SFCMgr(object):
     def _delete_port_chain(self):
         pass
 
-    def delete(self):
+    def cleanup(self):
         # TODO
+        pass
+
+    def dump(self):
         pass
 
     def output(self):

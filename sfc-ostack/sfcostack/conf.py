@@ -40,7 +40,7 @@ class ConfigHolder(object):
         self._conf_logger()
 
     def _conf_logger(self):
-        """Config logger"""
+        """Config shared logger"""
         log_conf = self.conf_dict['log']
         # default format string
         fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
@@ -52,11 +52,10 @@ class ConfigHolder(object):
         logging.basicConfig(level=level[log_conf['level']],
                             # MARK: current only use console output
                             handlers=[logging.StreamHandler()],
-                            format=fmt_str
-                            )
+                            format=fmt_str)
 
     def _get_cloud_conf(self):
-        """Get cloud conf"""
+        """Get cloud config"""
         if 'cloud' not in self.conf_dict:
             raise ConfigError('Missing cloud configs!')
         cloud_conf = self.conf_dict['cloud']
@@ -81,7 +80,7 @@ class ConfigHolder(object):
         return auth_args
 
     def get_sfc_flow(self):
-        """Get the flow classifier"""
+        """Get the flow classifier args"""
         flow_conf = self._get_sfc_conf()['flow_classifier']
         if len(flow_conf) > 1:
             raise ConfigError('Multiple flow classifiers are not allowed!')
@@ -91,7 +90,7 @@ class ConfigHolder(object):
         return value
 
     def get_sfc_net(self):
-        """Get SFC network configs"""
+        """Get SFC network args"""
         net_conf = self._get_sfc_conf()['network']
         return net_conf
 
@@ -106,6 +105,19 @@ class ConfigHolder(object):
             conf['name'] = srv
             srv_lst[conf['seq_num'] - 1] = conf
         return srv_lst
+
+    def trans_heat_tpl(self):
+        """Translate to a HEAT template
+
+        This may be implemented...
+        """
+        # mappings to HEAT resource types
+        rsc_mapping = {
+            'server': 'OS::Nova::Server',
+            'subnet': 'OS::Neutron::Subnet',
+            'port': 'OS::Neutron::Port',
+            'fip': 'OS::Neutron::FloatingIP'
+        }
 
 
 class ConfigParser(object):
@@ -137,3 +149,8 @@ class ConfigParser(object):
     def dump(self, url):
         """Dump config to a URL"""
         raise NotImplementedError('Not implemented yet...')
+
+
+if __name__ == "__main__":
+    conf_hd = ConfigHolder('yaml', './conf_example.yaml')
+    conf_hd.trans_heat_tpl()

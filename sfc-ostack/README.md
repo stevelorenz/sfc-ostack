@@ -1,4 +1,3 @@
-# A Framework for SFC on OpenStack #
+# Simple Framework for SFC Management on OpenStack #
 
-## Catalog ##
-
+Under Development for master thesis...

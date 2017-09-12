@@ -220,5 +220,6 @@ class SFCClient(object):
             else:
                 raise RuntimeError('Unknown operation: %s' % opt)
 
-        msg = "Timeout waiting for %s operation on %s with name: %s" % (opt, rsc_name, item_name)
+        msg = "Timeout waiting for %s operation on %s with name: %s" % (
+            opt, rsc_name, item_name)
         raise RscOptTimeout(msg)

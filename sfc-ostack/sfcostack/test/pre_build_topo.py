@@ -52,7 +52,8 @@ def pre_build_topo():
     sec_grp_args = conf.SEC_GRP_ARGS
     if not conn.network.find_security_group(sec_grp_args['name']):
         project = conn.identity.find_project(auth_args['project_name'])
-        print('[SECGRP] Create a test security group: %s...' % sec_grp_args['name'])
+        print('[SECGRP] Create a test security group: %s...' %
+              sec_grp_args['name'])
         sec_gp = conn.network.create_security_group(
             name=sec_grp_args['name'], project_id=project.id,
             description='Only for testing, allow all ICMP, TCP and UDP ingress access'
