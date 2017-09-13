@@ -23,15 +23,15 @@ REMOTE_LOC="~/"
 all:
 	@echo "Makefile needs your attention"
 
-# Lint and check errors
 lint-src:
-	@echo "Lint all python src..."
-	# Ignore some format issues
-	flake8 --exclude ./venv --ignore=E501,F401,E402 $(PYSRC)
+	@echo "Lint all python src with flake8..."
+	@flake8 --exclude ./venv --ignore=E501,F401,E402 \
+		--show-source --statistics --max-complexity=10 --exit-zero \
+		$(PYSRC)
 
 format-src:
 	@echo "Format all python src with autopep8..."
-	autopep8 -i $(PYSRC)
+	@autopep8 -i $(PYSRC)
 
 clean-tmp:
 	@echo "Run cleanups..."

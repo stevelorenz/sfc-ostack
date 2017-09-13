@@ -70,6 +70,7 @@ class Resource(object):
         'net': 'OS::Neutron::Net',
         'subnet': 'OS::Neutron::Subnet',
         'port': 'OS::Neutron::Port',
+        'fip': 'OS::Neutron::FloatingIP',
         'server': 'OS::Nova::Server'
     }
 
@@ -91,12 +92,6 @@ class Resource(object):
         # optional sections
         self.metadata = metadata
         self.depends_on = depends_on
-
-        self._handle_prop()
-
-    def _handle_prop(self):
-        """_handle_prop"""
-        pass
 
     def output_dict(self):
         """Output a resource as a nested dict"""
@@ -156,22 +151,25 @@ class HOT(object):
         output_lst.append(desc_str)
 
         # Parameter section
-        all_para = OrderedDict()
-        for para in self.parameter_lst:
-            all_para.update(para.output_dict())
-        output_dict.update({self.PARAMETERS: all_para})
+        if self.parameter_lst:
+            all_para = OrderedDict()
+            for para in self.parameter_lst:
+                all_para.update(para.output_dict())
+            output_dict.update({self.PARAMETERS: all_para})
 
         # Resource section
-        all_rsc = OrderedDict()
-        for rsc in self.resource_lst:
-            all_rsc.update(rsc.output_dict())
-        output_dict.update({self.RESOURCES: all_rsc})
+        if self.resource_lst:
+            all_rsc = OrderedDict()
+            for rsc in self.resource_lst:
+                all_rsc.update(rsc.output_dict())
+            output_dict.update({self.RESOURCES: all_rsc})
 
         yaml.add_representer(OrderedDict, self._repr_ordereddict)
         yaml.add_representer(dict, self._repr_ordereddict)
         yaml_string = yaml.dump(output_dict, default_flow_style=False)
         # Remove the ' for string values
-        yaml_string = yaml_string.replace('\'', '') .replace('\n\n', '\n')
+        yaml_string = yaml_string.replace('\'', '')
+        yaml_string = yaml_string.replace('\n\n', '\n')
         output_lst.append(yaml_string)
 
         return ''.join(output_lst)
@@ -182,7 +180,8 @@ if __name__ == "__main__":
 
     # Add a parameter
     para1 = Parameter('pub_net', type='string', label='public network')
-    para2 = Parameter('pvt_net_name', type='string', label='private network name')
+    para2 = Parameter('pvt_net_name', type='string',
+                      label='private network name')
 
     # Add a resource
     prop = {'admin_state_up': True, 'name': '{ get_param: pvt_net_name }'}

@@ -13,22 +13,17 @@ from openstack import connection
 
 import test_conf as conf
 
+conn = connection.Connection(**conf.AUTH_ARGS)
 
-def _get_public_net():
-    """Get the ID of the public network"""
-    conn = connection.Connection(**conf.AUTH_ARGS)
-    pub = conn.network.find_network('public')
-    if not pub:
-        raise RuntimeError('Can not find the public network')
-    return pub.id
-
+pubnet = conn.network.find_network('public')
+sec_grp = conn.network.find_security_group(conf.SEC_GRP_ARGS['name'])
 
 # Path of the heat template
 HEAT_TPL = conf.HEAT_ARGS['tpl_path']
 
 # Template input parameters
 PARAMETERS = {
-    'pub_net': _get_public_net(),
+    'pub_net': pubnet.id,
     'image_name': conf.IMAGE_ARGS['name'],
     'pvt_net_name': conf.NET_ARGS['pvt_net_name'],
     'pvt_subnet_name': conf.NET_ARGS['pvt_subnet_name'],
@@ -36,7 +31,8 @@ PARAMETERS = {
     'pvt_subnet_gw': conf.NET_ARGS['pvt_subnet_gw'],
     'pvt_subnet_dns': conf.NET_ARGS['pvt_subnet_dns'],
     'key_name': conf.SSH_KEY_ARGS['name'],
-    'flavor_name': conf.INS_ARGS['flavor']['name']
+    'flavor_name': conf.INS_ARGS['flavor']['name'],
+    'port_sec_grp': sec_grp.id
 }
 
 
@@ -48,5 +44,4 @@ if __name__ == "__main__":
     print('Create the topology with template: %s' % HEAT_TPL)
     heat.stacks.create(stack_name=conf.HEAT_ARGS['stack_name'],
                        template=open(HEAT_TPL, 'r').read(),
-                       parameters=PARAMETERS
-                       )
+                       parameters=PARAMETERS)

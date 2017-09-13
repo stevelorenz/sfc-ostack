@@ -3,7 +3,7 @@
 # vim:fenc=utf-8
 
 """
-About: BlaBlaBla
+About: Command-Line Tool
 Email: xianglinks@gmail.com
 """
 

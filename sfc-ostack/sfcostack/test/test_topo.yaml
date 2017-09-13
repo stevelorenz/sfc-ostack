@@ -22,7 +22,7 @@
 
 heat_template_version: 2017-02-24  # stable/ocata
 
-description: Test sfc-ostack
+description: A HOT template for testing sfc-ostack
 
 parameters:
 
@@ -64,6 +64,10 @@ parameters:
     type: comma_delimited_list
     label: DNS servers
 
+  port_sec_grp:
+    type: string
+    label: ID of the security group for all created ports
+
 resources:
 
   # --- Network ----
@@ -92,6 +96,7 @@ resources:
     properties:
       name: dst_pt
       network_id: { get_resource: pvt_net }
+      security_groups: [ get_param: port_sec_grp ]
       fixed_ips:
         - subnet_id: { get_resource: pvt_subnet }
 

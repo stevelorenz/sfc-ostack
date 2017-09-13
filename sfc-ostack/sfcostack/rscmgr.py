@@ -132,8 +132,10 @@ class RscMgr(object):
                 return None
             # Not found
             total_wait += interval
-            self.logger.debug('%s Wait additional %s seconds', rsc_args['name'], total_wait)
-        raise RscOptTimeout('Creation of %s:%s timeout!' % (rsc_type, rsc_args['name']))
+            self.logger.debug('%s Wait additional %s seconds',
+                              rsc_args['name'], total_wait)
+        raise RscOptTimeout('Creation of %s:%s timeout!' %
+                            (rsc_type, rsc_args['name']))
 
     def _wait_rsc_deleted(self, rsc, interval, timeout):
         """Wait for a resource to be deleted"""
@@ -148,8 +150,10 @@ class RscMgr(object):
                 return None
             # Found
             total_wait += interval
-            self.logger.debug('%s Wait additional %s seconds', rsc_args['name'], total_wait)
-        raise RscOptTimeout('Delete of %s:%s timeout!' % (rsc_type, rsc_args['name']))
+            self.logger.debug('%s Wait additional %s seconds',
+                              rsc_args['name'], total_wait)
+        raise RscOptTimeout('Delete of %s:%s timeout!' %
+                            (rsc_type, rsc_args['name']))
 
     def rsc_create(self):
         """Create all resources in the stack
@@ -173,7 +177,8 @@ class RscMgr(object):
 
             # Special actions for special resources
             if rsc_type == 'server':
-                self.conn.compute.wait_for_server(rsc_obj, status='ACTIVE', failures=['ERROR'], interval=2, wait=300)
+                self.conn.compute.wait_for_server(rsc_obj, status='ACTIVE', failures=[
+                                                  'ERROR'], interval=2, wait=300)
 
     def rsc_delete(self):
         """Delete all resources in the stack

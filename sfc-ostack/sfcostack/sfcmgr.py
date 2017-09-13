@@ -3,18 +3,19 @@
 # vim:fenc=utf-8
 
 """
-About: SFC(Service Function Chain) Manager
+About: SFC Manager
 
 Email: xianglinks@gmail.com
 """
 
 import logging
 import time
+from collections import deque, OrderedDict
 
 import paramiko
 from openstack import connection
 
-from sfcostack import sfcclient
+from sfcostack import hot, sfcclient
 
 
 class SFCMgrError(Exception):
@@ -22,7 +23,7 @@ class SFCMgrError(Exception):
     pass
 
 
-class ConfInsError(SFCMgrError):
+class ConfigInstanceError(SFCMgrError):
     """Error while configuring instances"""
     pass
 
@@ -34,106 +35,80 @@ class SFCMgr(object):
     def __init__(self, conf_hd):
         """Init a SFC Manager"""
         self.logger = logging.getLogger(__name__)
-        self.conf_hd = conf_hd  # config holder
+        self.conf_hd = conf_hd
+        self.stack = deque()
 
         auth_args = self.conf_hd.get_cloud_auth()
         self.conn = connection.Connection(**auth_args)
         self.sfcclient = sfcclient.SFCClient(auth_args, self.logger)
 
-    ################
-    #  Help Funcs  #
-    ################
+    def _output_hot(self):
+        """Output essential resources as a HOT template
 
-    def _get_pid(self, name):
-        """Get ID of the port with given name"""
-        port = self.conn.network.find_port(name)
-        return port.id
-
-    ###################
-    #  Resource CRUD  #
-    ###################
-
-    def _create_neutron_pp(self, srv_name):
-        """Create to be chained neutron port pairs
-
-        Port name pattern:
-            ingress: srv_name_in egress: srv_name_out
-
-        :retype: tuple
+        :retype: str
         """
-        pp = list()
-        self.logger.info(
-            'Create ingress and egress ports for server: %s...' % srv['name'])
+        fc_conf = self.conf_hd.get_sfc_fc()
+        # HOT container
+        hot_cont = hot.HOT(desc=fc_conf['description'])
+
+        prop = dict()  # properties dict
+        # - Network, subnet
         net_conf = self.conf_hd.get_sfc_net()
+        pubnet = self.conn.network.find_network('public')
+        if not pubnet:
+            raise SFCMgrError('Can not find the public network!')
         net = self.conn.network.find_network(net_conf['net_name'])
-        for suf in ('_in', '_out'):
-            # MARK: subnet_id is not supported
-            pt_args = {
-                'name': ''.join((srv['name'], suf)),
-                'network_id': net.id
+        if not net:
+            raise SFCMgrError('Can not find network:%s for FC servers' % net_conf['net_name'])
+        subnet = self.conn.network.find_subnet(net_conf['subnet_name'])
+        if not subnet:
+            raise SFCMgrError('Can not find the subnet:%s for FC servers.' % net_conf['subnet_name'])
+
+        # - FC server, neutron ports, floating IPs
+        srv_lst = self.conf_hd.get_sfc_server()
+        # MARK: CAN be better... relative straight forward
+        for srv in srv_lst:
+            networks = list()
+            # Remote access, ingress and egress ports
+            for suffix in ('pt', 'pt_in', 'pt_out'):
+                port_name = '_'.join((srv['name'], suffix))
+                prop = {
+                    'name': port_name,
+                    'network_id': net.id,
+                    # A list of subnet IDs
+                    'fixed_ips': [{'subnet_id': subnet.id}]
+                }
+                networks.append({'port': '{ get_resource: %s }' % port_name})
+                hot_cont.resource_lst.append(
+                    hot.Resource(port_name, 'port', prop))
+
+            # Floating IP for remote access ports
+            prop = {
+                'floating_network': pubnet.id,
+                'port_id': '{ get_resource: %s }' % (srv['name'] + '_pt')
             }
-            self.logger.debug('Create port %s on %s'
-                              % (pt_args['name'], net.name))
-            self.conn.network.create_port(**pt_args)
-            pp.append(pt_args['name'])
-        return tuple(pp)
+            hot_cont.resource_lst.append(
+                hot.Resource(srv['name'] + '_fip', 'fip', prop))
 
-    def _create_server(self, srv):
-        """Create to be chained servers
+            prop = {
+                'name': srv['name'],
+                'key_name': srv['ssh']['pub_key_name'],
+                'image': srv['image'],
+                'flavor': srv['flavor'],
+                'networks': networks
+            }
+            hot_cont.resource_lst.append(
+                hot.Resource(srv['name'], 'server', prop))
 
-        :param srv (dict): a dict of server parameters.
-        """
-        self.logger.info('Launch SFC server %s...' % srv['name'])
-        net_conf = self.conf_hd.get_sfc_net()
-        # Used to associate floating IPs
-        pub = self.conn.network.find_network('public')
-        net = self.conn.network.find_network(net_conf['net_name'])
-        sec_grp = self.conn.network.find_security_group(
-            net_conf['security_group'])
-        srv_args = {
-            'name': srv['name'],
-            'image_id': self.conn.compute.find_image(srv['image']).id,
-            'flavor_id': self.conn.compute.find_flavor(srv['flavor']).id,
-            'networks': [{"uuid": net.id}],
-            'key_name': srv['ssh']['pub_key_name'],
-            'security_groups': []
-        }
-        srv_ins = self.conn.compute.create_server(**srv_args)
-        # Wait until the server is active, maximal 5 min
-        srv_ins = self.conn.compute.wait_for_server(
-            srv_ins, status='ACTIVE', wait=300)
-        # Add a security group
-        self.conn.compute.add_security_group_to_server(srv_ins.id, sec_grp.id)
-        # Add a floating IP, the instance SHOULD only has one interface now
-        ifce = list(self.conn.compute.server_interfaces(srv_ins.id))[0]
-        fip_args = {
-            'floating_network_id': pub.id,
-            'port_id': ifce.port_id
-        }
-        self.logger.info('Assign a floating IP to %s' % srv['name'])
-        fip = self.conn.network.create_ip(**fip_args)
+        return hot_cont.output_yaml_str()
 
-        # Rename iterface to the server name
-        self.conn.network.update_port(ifce.port_id,
-                                      **{'name': srv['name']})
-
-        # attach chain-interfaces to the instance
-        base = srv['name']
-        for suf in ('_in', '_out'):
-            self.logger.info('Attach port:%s to the instance:%s'
-                             % ((base + suf), srv['name']))
-            pt = self.conn.network.find_port(base + suf)
-            self.conn.compute.create_server_interface(srv_ins.id,
-                                                      **{'port_id': pt.id})
-        # config the server via SSH and floating IP
-        time.sleep(1)  # slowly please...
-        self._config_server(srv, fip.floating_ip_address)
-
-    def _config_server(self, srv, ip):
-        """Config the chain server via SSH
+    def _config_server(self, srv, ip, port=22, interval=3, timeout=60):
+        """Run essential configs on a FC server
 
         :param srv (dict): Dict of server parameters.
         :param ip (str): IP for SSH
+        :param interval (float):
+        :param timeout (float):
         """
         net_conf = self.conf_hd.get_sfc_net()
         subnet = self.conn.network.find_subnet(net_conf['subnet_name'])
@@ -141,38 +116,47 @@ class SFCMgr(object):
         ssh_clt = paramiko.SSHClient()
         # Allow connection not in the known_host
         ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_clt.connect(ip, 22, ssh_conf['user_name'],
+        ssh_clt.connect(ip, port, ssh_conf['user_name'],
                         key_filename=ssh_conf['pvt_key_file'])
-        self.logger.info('Config server:%s via SSH...' % srv['name'])
-        # TODO: Replace with paras from config file
-        for ifce in ['eth1', 'eth2']:
+        self.logger.info('Config server:%s with IP:%s via SSH...'
+                         % (srv['name'], ip))
+        self.logger.debug('DHCP Client: %s' % srv['dhcp_client'])
+        for ifce in srv['ifce']:
             for cmd in (
                 'sudo ip link set %s up' % ifce,
-                # MARK: assume dhclient is installed
-                'sudo dhclient %s' % ifce,
+                'sudo  %s %s' % (srv['dhcp_client'], ifce),
                 # Remove duplicated routing rules
                 'sudo ip route delete %s dev %s' % (subnet.cidr, ifce)
             ):
-                # Repeat the command if error detected
-                succ = 0
+                # Repeat the command if error detected until timeout
+                total_time, succ = 0, 0
                 while not succ:
                     stdin, stdout, stderr = ssh_clt.exec_command(cmd)
                     succ = 1
+                    # Error is detected
                     if stdout.channel.recv_exit_status() != 0:
                         succ = 0
-                        time.sleep(1)
-        # close connection
-        ssh_clt.close()
+                        # Check wait time
+                        if total_time >= timeout:
+                            break
+                        total_time += interval
+        else:
+            ssh_clt.close()
+
+        raise ConfigInstanceError('Config server:%s timeout!' % srv['name'])
 
     def _create_flow_classifier(self):
-        """Create the flow classifier"""
+        """Create the flow classifier
+
+        :return: The ID of the created flow classifier
+        """
         flow_conf = self.conf_hd.get_sfc_flow()
         self.logger.info('Create the flow classifier...')
         self.sfcclient.create('flow_classifier', flow_conf)
         return self.sfcclient.get_id('flow_classifier', flow_conf['name'])
 
     def _create_port_chain(self, pp_lst, fc_id):
-        """Create the port chain
+        """TODO: Create the port chain
 
         :param pp_lst (list): port pair list
         """
@@ -213,42 +197,14 @@ class SFCMgr(object):
 
         Steps:
             1. Create neutron ports
-            2. Launch server
-            3. Create flow classifier
-            4. Create port chain
+             . Create flow classifier
+             . Create port chain
         """
-        srv_lst = self.conf_hd.get_sfc_server()
-        pp_lst = list()
-        for srv in srv_lst:
-            pp_lst.append(self._create_neutron_pp(srv))
-            time.sleep(1)
-            self._create_server(srv)
-            time.sleep(1)
-        fc_id = self._create_flow_classifier()
-        time.sleep(1)
-        self._create_port_chain(pp_lst, fc_id)
-        time.sleep(1)
-        self.logger.info('SFC is created.')
+        hot_str = self._output_hot()
+        print(hot_str)
+        with open('test.yaml', 'w+') as f:
+            f.write(hot_str)
 
-    def _delete_port(self):
-        pass
 
-    def _delete_server(self):
-        pass
-
-    def _delete_flow_classifier(self):
-        pass
-
-    def _delete_port_chain(self):
-        pass
-
-    def cleanup(self):
-        # TODO
-        pass
-
-    def dump(self):
-        pass
-
-    def output(self):
-        """output"""
-        pass
+if __name__ == "__main__":
+    print('Run tests...')

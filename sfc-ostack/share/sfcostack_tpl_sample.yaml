@@ -59,6 +59,7 @@ SFC:
       # Sequence number in the chain
       seq_num: 1
       ifce: [eth1, eth2]
+      dhcp_client: dhclient
       image: ubuntu-cloud
       flavor: m.test
       ssh:
@@ -70,6 +71,7 @@ SFC:
     chn2:
       seq_num: 2
       ifce: [eth1, eth2]
+      dhcp_client: dhclient
       image: ubuntu-cloud
       flavor: m.test
       ssh:
