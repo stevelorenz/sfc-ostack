@@ -33,6 +33,11 @@ format-src:
 	@echo "Format all python src with autopep8..."
 	@autopep8 -i $(PYSRC)
 
+stat-src:
+	@echo "# Statistics of all python src:"
+	@echo "- Line numbers: "
+	@wc -l $(PYSRC)
+
 clean-tmp:
 	@echo "Run cleanups..."
 	echo $(TMP)

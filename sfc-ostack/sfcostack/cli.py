@@ -12,7 +12,7 @@ import logging
 import sys
 sys.path.insert(0, '../')
 
-from sfcostack import conf, sfcmgr
+from sfcostack import conf, sfc_mngr
 
 
 def cli():
@@ -31,8 +31,9 @@ def dev_test():
     conf_hd = conf.ConfigHolder('yaml', './conf_example.yaml')
     logger = logging.getLogger(__name__)
     logger.debug('Run tests for developing...')
-    sfc_mgr = sfcmgr.SFCMgr(conf_hd)
-    sfc_mgr.create()
+    sfcmngr = sfc_mngr.SFCMngr(conf_hd)
+    sfcmngr.create()
+    # sfcmngr.delete()
 
 
 if __name__ == "__main__":

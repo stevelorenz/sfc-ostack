@@ -27,6 +27,7 @@ SFC:
   function_chain:
     # Name of the function chain
     name: udp_dst_9999
+    description: A Function chain for flows with destination UDP port 9999
   # Flow classifier rules
   # Rules for flows that will be routed into the function chain
   flow_classifier:
@@ -51,7 +52,7 @@ SFC:
   network:
     net_name: net1
     subnet_name: subnet1
-    security_group: test
+    security_group_name: test
   # Servers for FC
   server:
     # Name of the server
@@ -70,6 +71,17 @@ SFC:
         pvt_key_file: ./test.pem
     chn2:
       seq_num: 2
+      ifce: [eth1, eth2]
+      dhcp_client: dhclient
+      image: ubuntu-cloud
+      flavor: m.test
+      ssh:
+        user_name: ubuntu
+        pub_key_name: test
+        pvt_key_file: ./test.pem
+
+    chn3:
+      seq_num: 3
       ifce: [eth1, eth2]
       dhcp_client: dhclient
       image: ubuntu-cloud

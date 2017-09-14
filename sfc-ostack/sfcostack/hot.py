@@ -23,27 +23,20 @@ class HOTError(Exception):
 
 class Parameter(object):
 
-    """HEAT Parameter"""
+    """HOT Parameter Attr"""
 
     KEYS = (TYPE, DESCRIPTION, DEFAULT, CONSTRAINTS, HIDDEN, LABEL) = \
         ('type', 'description', 'default', 'constraints', 'hidden', 'label')
 
     def __init__(self, name, type, label=None, desc=None, default=None):
-        """Init a HEAT Parameter
-
-        :param name:
-        :param type:
-        :param label:
-        :param desc:
-        :param default:
-        """
+        """Init a HOT parameter"""
         self.name = name
         self.type = type
         self.label = label
         self.desc = desc
         self.default = default
 
-    def output_dict(self):
+    def get_output_dict(self):
         """Output a parameter as a nested dict"""
         para = OrderedDict()
         para[self.TYPE] = self.type
@@ -59,9 +52,26 @@ class Parameter(object):
         return {self.name: para}
 
 
+class Output(object):
+
+    """HOT Output Attr"""
+
+    def __init__(self, name, value, desc=None):
+        self.name = name
+        self.value = value
+        self.desc = desc
+
+    def get_output_dict(self):
+        if self.desc:
+            return {self.name: {'value': self.value,
+                                'description': self.desc}}
+        else:
+            return {self.name: {'value': self.value}}
+
+
 class Resource(object):
 
-    """HEAT Resource"""
+    """HOT Resource Attr"""
 
     SECTIONS = (TYPE, PROPERTIES, MEDADATA, DEPENDS_ON) = \
         ('type', 'properties', 'metadata', 'depends_on')
@@ -75,14 +85,7 @@ class Resource(object):
     }
 
     def __init__(self, name, type=None, prop=None, metadata=None, depends_on=None):
-        """Init a HEAT Resource
-
-        :param name:
-        :param type:
-        :param prop (dict): A dict of resource-specific properties
-        :param metadata:
-        :param depends_on:
-        """
+        """Init a HOT resource"""
         self.logger = logging.getLogger(__name__)
         self.name = name
         self.type = self.RSC_TYPE_MAP.get(type, None)
@@ -93,7 +96,7 @@ class Resource(object):
         self.metadata = metadata
         self.depends_on = depends_on
 
-    def output_dict(self):
+    def get_output_dict(self):
         """Output a resource as a nested dict"""
         rsc = OrderedDict()
         rsc[self.TYPE] = self.type
@@ -105,7 +108,10 @@ class Resource(object):
 
 class HOT(object):
 
-    """HOT Template Constructor"""
+    """HOT Template Constructor
+
+    Parameters, resources, outputs are stored in a list which preserves the order
+    """
 
     SECTIONS = (VERSION, DESCRIPTION, PARAMETER_GROUPS, PARAMETERS,
                 RESOURCES, OUTPUTS, MAPPINGS) = \
@@ -141,38 +147,45 @@ class HOT(object):
 
         :rtype: string
         """
-        output_lst = list()
-        output_dict = OrderedDict()
+        all_output_lst = list()
+        all_output_dict = OrderedDict()
 
-        # --- Positional Sections ---
+        # Positional sections
         desc_str = ''.join((self.DESCRIPTION, ': ', self.desc, "\n\n"))
         ver_str = ''.join((self.VERSION, ': ', self.ver, "\n\n"))
-        output_lst.append(ver_str)
-        output_lst.append(desc_str)
+        all_output_lst.append(ver_str)
+        all_output_lst.append(desc_str)
 
         # Parameter section
         if self.parameter_lst:
             all_para = OrderedDict()
             for para in self.parameter_lst:
-                all_para.update(para.output_dict())
-            output_dict.update({self.PARAMETERS: all_para})
+                all_para.update(para.get_output_dict())
+            all_output_dict.update({self.PARAMETERS: all_para})
 
         # Resource section
         if self.resource_lst:
             all_rsc = OrderedDict()
             for rsc in self.resource_lst:
-                all_rsc.update(rsc.output_dict())
-            output_dict.update({self.RESOURCES: all_rsc})
+                all_rsc.update(rsc.get_output_dict())
+            all_output_dict.update({self.RESOURCES: all_rsc})
+
+        # Output section
+        if self.output_lst:
+            all_output = OrderedDict()
+            for output in self.output_lst:
+                all_output.update(output.get_output_dict())
+            all_output_dict.update({self.OUTPUTS: all_output})
 
         yaml.add_representer(OrderedDict, self._repr_ordereddict)
         yaml.add_representer(dict, self._repr_ordereddict)
-        yaml_string = yaml.dump(output_dict, default_flow_style=False)
+        yaml_string = yaml.dump(all_output_dict, default_flow_style=False)
         # Remove the ' for string values
         yaml_string = yaml_string.replace('\'', '')
         yaml_string = yaml_string.replace('\n\n', '\n')
-        output_lst.append(yaml_string)
+        all_output_lst.append(yaml_string)
 
-        return ''.join(output_lst)
+        return ''.join(all_output_lst)
 
 
 if __name__ == "__main__":
