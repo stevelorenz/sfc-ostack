@@ -17,14 +17,32 @@ from sfcostack.resource import sfc_rsc
 
 
 def cli():
-    """CLI"""
-    parser = argparse.ArgumentParser(description='Desp')
-    parser.add_argument("conf_path", help="configuration file path")
+    """CLI Entry"""
+    logger = logging.getLogger(__name__)
+    desc = 'SFC-OSTACK Framework'
+    parser = argparse.ArgumentParser(description=desc)
+
+    parser.add_argument(
+        'conf_path', help='Path of configuration file(YAML format).', type=str
+    )
+    parser.add_argument(
+        'operation', help='Operation for SFC', choices=['create', 'delete']
+    )
+
     if len(sys.argv) < 2:
         parser.print_help()
         sys.exit(0)
     args = parser.parse_args()
-    print(args)
+
+    conf_hd = conf.ConfigHolder('yaml', args.conf_path)
+    sfc = sfc_rsc.SFC(conf_hd)
+
+    if args.operation == 'create':
+        logger.info('Create the SFC, config file path: %s' % args.conf_path)
+        sfc.create()
+    elif args.operation == 'delete':
+        logger.info('Delete the SFC, config file: %s' % args.conf_path)
+        sfc.delete()
 
 
 def dev_test():
@@ -39,4 +57,4 @@ def dev_test():
 
 
 if __name__ == "__main__":
-    dev_test()
+    cli()
