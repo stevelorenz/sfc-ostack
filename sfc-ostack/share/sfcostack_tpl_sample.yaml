@@ -5,7 +5,7 @@
 
 ---
 
-# logging
+# Logging
 log:
   level: INFO
 
@@ -21,54 +21,64 @@ cloud:
     user_domain_name: default
     password: stack
 
-# Service Function chaining configs
+# SFC(Service Function Chaining) configs
 SFC:
-  # Function chain parameters
+  # FC(Function Chain) parameters
   function_chain:
-    # Name of the function chain
     name: udp_dst_9999
     description: A Function chain for flows with destination UDP port 9999
+
   # Flow classifier rules
-  # Rules for flows that will be routed into the function chain
+  # Rules for flow(s) that will be routed into the FC
   flow_classifier:
-    # Name of the flow classifier
-    udp_dst_9999:
-      description: BlaBlaBla...
-      # L2 ethertype. Can be IPv4 or IPv6 only.
-      ethertype: IPv4
-      protocol: UDP
-      source_port_range_min: 0
-      source_port_range_max: 65535
-      destination_port_range_min: 9999
-      destination_port_range_max: 9999
-      # Source IPv4 or IPv6 prefix, as CIDR
-      source_ip_prefix: 10.0.0.1/32
-      destination_ip_prefix: 10.0.0.3/32
-      # ID of the source neutron port
-      logical_source_port: 5ce5d533-a599-4a44-83a8-5fcf5d4ad3c5
-      # ID of the destination neutron port
-      logical_destination_port: 52891f9a-3933-42d5-bb56-9586e68c404e
-  # Neutron network for SF
+    name: udp_dst_9999_fc
+    description: UDP traffic from public network
+    # L2 ethertype. Can be IPv4 or IPv6 only.
+    ethertype: IPv4
+    protocol: UDP
+    source_port_range_min: 0
+    source_port_range_max: 65535
+    destination_port_range_min: 9999
+    destination_port_range_max: 9999
+    # Source IPv4 or IPv6 prefix, as CIDR
+    source_ip_prefix: 10.0.0.1/32
+    destination_ip_prefix: 10.0.0.3/32
+    # ID of the source and destination neutron port
+    logical_source_port:
+    logical_destination_port:
+
+    # TODO: IP of the source and destination neutron port
+    # logical_source_ip: 10.0.0.1
+    # logical_destination_ip: 10.0.0.3
+
+  # Neutron network for FC servers
   network:
     net_name: net1
     subnet_name: subnet1
+    # This security group is added into all created neutron ports for FC servers
     security_group_name: test
-  # Servers for FC
+
+  # FC servers
   server:
     # Name of the server
     chn1:
-      # Sequence number in the chain
+      # Sequence number in the FC
       seq_num: 1
+      # Name of the ingress and egress interfaces in OS
       ifce: [eth1, eth2]
+      # Command for configuring interface with DHCP
       dhcp_client: dhclient
       image: ubuntu-cloud
       flavor: m.test
       ssh:
       # SSH configs
         user_name: ubuntu
+        # Name of the public key
         pub_key_name: test
-        # Path of private key file
+        # Path of private key file(pem file)
         pvt_key_file: ./test.pem
+
+    # Use ubuntu cloud
     chn2:
       seq_num: 2
       ifce: [eth1, eth2]

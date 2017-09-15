@@ -85,12 +85,7 @@ class ConfigHolder(object):
     def get_sfc_flow(self):
         """Get flow classifier args"""
         flow_conf = self._get_sfc_conf()['flow_classifier']
-        if len(flow_conf) > 1:
-            raise ConfigError('Multiple flow classifiers are not allowed!')
-        # Convert to a single un-nested dict
-        for flow, conf in flow_conf.items():
-            conf['name'] = flow
-        return conf
+        return flow_conf
 
     def get_sfc_net(self):
         """Get SFC network args"""

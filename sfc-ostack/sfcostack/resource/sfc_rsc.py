@@ -3,7 +3,7 @@
 # vim:fenc=utf-8
 
 """
-About: SFC Manager
+About: SFC Resource
 
 Email: xianglinks@gmail.com
 """
@@ -17,22 +17,23 @@ from heatclient import client as heatclient
 from keystoneauth1 import loading, session
 from openstack import connection
 
-from sfcostack import hot, netsfc_clt
+from sfcostack import netsfc_clt
+from sfcostack.resource import hot
 
 
-class SFCMngrError(Exception):
-    """Base error of SFCMngr"""
+class SFCRscError(Exception):
+    """Base error of SFC resource"""
     pass
 
 
-class ConfigInstanceError(SFCMngrError):
+class ConfigInstanceError(SFCRscError):
     """Error while configuring instances"""
     pass
 
 
-class SFCMngr(object):
+class SFC(object):
 
-    """SFC Manager
+    """SFC Resource
 
     TODO:
         self.conn, sfcclient and heatclient SHOULD share the same keystone auth
@@ -40,7 +41,7 @@ class SFCMngr(object):
     """
 
     def __init__(self, conf_hd):
-        """Init a SFC Manager"""
+        """Init a SFC resource"""
         self.logger = logging.getLogger(__name__)
         self.conf_hd = conf_hd
         self.sfc_stack = deque()
@@ -57,7 +58,43 @@ class SFCMngr(object):
         sess = session.Session(auth=auth)
         self.heat_client = heatclient.Client('1', session=sess)
 
-        self.pp_lst = list()
+        self._get_network_id()
+
+    def _get_network_id(self):
+        """Get bound network resource IDs"""
+        net_conf = self.conf_hd.get_sfc_net()
+        pubnet = self.conn.network.find_network('public')
+        if not pubnet:
+            raise SFCRscError('Can not find the public network!')
+        net = self.conn.network.find_network(net_conf['net_name'])
+        if not net:
+            raise SFCRscError(
+                'Can not find network:%s for FC servers' % net_conf['net_name'])
+        subnet = self.conn.network.find_subnet(net_conf['subnet_name'])
+        if not subnet:
+            raise SFCRscError(
+                'Can not find the subnet:%s for FC servers.' % net_conf['subnet_name'])
+
+        sec_grp = self.conn.network.find_security_group(
+            net_conf['security_group_name'])
+        if not sec_grp:
+            raise SFCRscError(
+                'Can not find the security group:%s for FC servers' %
+                net_conf['security_group_name']
+            )
+
+        self.network_id = {
+            'public': pubnet.id,
+            'net': net.id,
+            'subnet': subnet.id,
+            'sec_grp': sec_grp.id
+        }
+
+    def _get_pp(self):
+        """TODO: Get a list of to be chained port pairs
+                 This CAN be used by other functions
+        """
+        pass
 
     def _get_output_hot(self):
         """Output essential resources as a HOT template
@@ -67,29 +104,7 @@ class SFCMngr(object):
         fc_conf = self.conf_hd.get_sfc_fc()
         # HOT container
         hot_cont = hot.HOT(desc=fc_conf['description'])
-
         prop = dict()  # properties dict
-        # - Network, subnet
-        net_conf = self.conf_hd.get_sfc_net()
-        pubnet = self.conn.network.find_network('public')
-        if not pubnet:
-            raise SFCMngrError('Can not find the public network!')
-        net = self.conn.network.find_network(net_conf['net_name'])
-        if not net:
-            raise SFCMngrError(
-                'Can not find network:%s for FC servers' % net_conf['net_name'])
-        subnet = self.conn.network.find_subnet(net_conf['subnet_name'])
-        if not subnet:
-            raise SFCMngrError(
-                'Can not find the subnet:%s for FC servers.' % net_conf['subnet_name'])
-
-        sec_grp = self.conn.network.find_security_group(
-            net_conf['security_group_name'])
-        if not sec_grp:
-            raise SFCMngrError(
-                'Can not find the security group:%s for FC servers' %
-                net_conf['security_group_name']
-            )
 
         # - FC server, neutron ports, floating IPs
         srv_lst = self.conf_hd.get_sfc_server()
@@ -101,11 +116,11 @@ class SFCMngr(object):
                 port_name = '_'.join((srv['name'], suffix))
                 prop = {
                     'name': port_name,
-                    'network_id': net.id,
+                    'network_id': self.network_id['net'],
                     # A list of subnet IDs
-                    'fixed_ips': [{'subnet_id': subnet.id}],
+                    'fixed_ips': [{'subnet_id': self.network_id['subnet']}],
                     # A list of security groups
-                    'security_groups': [sec_grp.id]
+                    'security_groups': [self.network_id['sec_grp']]
                 }
                 networks.append({'port': '{ get_resource: %s }' % port_name})
                 hot_cont.resource_lst.append(
@@ -113,7 +128,7 @@ class SFCMngr(object):
 
             # Floating IP for remote access ports
             prop = {
-                'floating_network': pubnet.id,
+                'floating_network': self.network_id['public'],
                 'port_id': '{ get_resource: %s }' % (srv['name'] + '_pt')
             }
             hot_cont.resource_lst.append(
@@ -136,8 +151,8 @@ class SFCMngr(object):
 
         :param srv (dict): Dict of server parameters.
         :param ip (str): IP for SSH
-        :param interval (float):
-        :param timeout (float):
+        :param interval (float): Interval for checking SSH connection
+        :param timeout (float): Timeout for connection error
         """
         net_conf = self.conf_hd.get_sfc_net()
         subnet = self.conn.network.find_subnet(net_conf['subnet_name'])
@@ -152,17 +167,16 @@ class SFCMngr(object):
                 succ = 1
                 ssh_clt.connect(ip, port, ssh_conf['user_name'],
                                 key_filename=ssh_conf['pvt_key_file'])
-            except paramiko.ssh_exception.NoValidConnectionsError:
+            except paramiko.ssh_exception.NoValidConnectionsError as error:
                 succ = 0
                 time.sleep(interval)
                 total_time += interval
                 if total_time > timeout:
                     raise ConfigInstanceError(
-                        'Can not create the SSH connection.')
+                        'Can not create SSH connection.' + str(error))
 
-        self.logger.info('Config server:%s with IP:%s via SSH...'
+        self.logger.info('Config server:%s with IP:%s via SSH.'
                          % (srv['name'], ip))
-        self.logger.debug('DHCP Client: %s' % srv['dhcp_client'])
         for ifce in srv['ifce']:
             for cmd in (
                 'sudo ip link set %s up' % ifce,
@@ -170,23 +184,10 @@ class SFCMngr(object):
                 # Remove duplicated routing rules
                 'sudo ip route delete %s dev %s' % (subnet.cidr, ifce)
             ):
-                # Repeat the command if error detected until timeout
-                total_time, succ = 0, 0
-                while not succ:
-                    stdin, stdout, stderr = ssh_clt.exec_command(cmd)
-                    succ = 1
-                    # Error is detected
-                    if stdout.channel.recv_exit_status() != 0:
-                        succ = 0
-                        # Check wait time
-                        if total_time >= timeout:
-                            break
-                        total_time += interval
-        else:
-            ssh_clt.close()
-            return
-        ssh_clt.close()
-        raise ConfigInstanceError('Config server:%s timeout!' % srv['name'])
+                stdin, stdout, stderr = ssh_clt.exec_command(cmd)
+                # Error is detected
+                if stdout.channel.recv_exit_status() != 0:
+                    raise ConfigInstanceError(stderr.read())
 
     def _create_flow_classifier(self):
         """Create the flow classifier
@@ -194,10 +195,14 @@ class SFCMngr(object):
         :return: The ID of the created flow classifier
         """
         flow_conf = self.conf_hd.get_sfc_flow()
-        self.logger.info('Create the flow classifier...')
 
-        # TODO: Get logical src and dest port ID
+        # TODO: Use IP instead of ID
+        # src_ip = flow_conf['logical_source_ip']
+        # dst_ip = flow_conf['logical_destination_ip']
+        # flow_conf.pop('logical_source_ip', None)
+        # flow_conf.pop('logical_destination_ip', None)
 
+        self.logger.info('Create flow classifier.')
         self.pc_client.create('flow_classifier', flow_conf)
         return self.pc_client.get_id('flow_classifier', flow_conf['name'])
 
@@ -239,7 +244,7 @@ class SFCMngr(object):
         }
         self.pc_client.create('port_chain', pc_args)
 
-    def create(self):
+    def create(self, timeout=300):
         """Create the service function chain
 
         Steps:
@@ -258,11 +263,11 @@ class SFCMngr(object):
         srv_lst = self.conf_hd.get_sfc_server()
 
         # Wait for floating IPs have the status ACTIVE
-        for fip in self.conn.network.ips(status='DOWN'):
-            while True:
-                time.sleep(1)
-                if fip.status == 'ACTIVE':
-                    break
+        # for fip in self.conn.network.ips(status='DOWN'):
+        #     while True:
+        #         time.sleep(1)
+        #         if fip.status == 'ACTIVE':
+        #             break
 
         for srv in srv_lst:
             # MARK: the server might not be created yet
@@ -287,25 +292,21 @@ class SFCMngr(object):
         self.logger.info('Create the port chain.')
         self._create_port_chain(fc_id)
 
-    def delete(self):
+    def delete(self, timeout=300):
         """Delete the service function chain"""
 
-        self.logger.info('Delete all port chains.')
+        self.logger.info('Delete port chain resources.')
         for pc in self.pc_client.list('port_chain'):
             self.pc_client.delete('port_chain', pc['name'])
             time.sleep(1)
-
-        self.logger.info('Delete all port pair groups.')
         for pp_grp in self.pc_client.list('port_pair_group'):
             self.pc_client.delete('port_pair_group', pp_grp['name'])
             time.sleep(1)
-
-        self.logger.info('Delete all port pairs.')
         for pp in self.pc_client.list('port_pair'):
             self.pc_client.delete('port_pair', pp['name'])
             time.sleep(1)
 
-        self.logger.info('Delete all flow classifiers')
+        self.logger.info('Delete flow classifier.')
         for fc in self.pc_client.list('flow_classifier'):
             self.pc_client.delete('flow_classifier', fc['name'])
             time.sleep(1)
@@ -315,8 +316,8 @@ class SFCMngr(object):
                          fc_conf['name'])
         fc_stack = self.conn.orchestration.find_stack(fc_conf['name'])
         if not fc_stack:
-            raise SFCMngrError('Can not find stack with name: %s' %
-                               fc_conf['name'])
+            raise SFCRscError('Can not find stack with name: %s' %
+                              fc_conf['name'])
         self.conn.orchestration.delete_stack(fc_stack)
 
 
