@@ -50,6 +50,10 @@ class ConfigHolder(object):
                             handlers=[logging.StreamHandler()],
                             format=fmt_str)
 
+    #######################
+    #  Get Main Sections  #
+    #######################
+
     def _get_cloud_conf(self):
         """Get cloud config"""
         if 'cloud' not in self.conf_dict:
@@ -65,7 +69,7 @@ class ConfigHolder(object):
         if 'SFC' not in self.conf_dict:
             raise ConfigError('Missing SFC configs!')
         sfc_conf = self.conf_dict['SFC']
-        for sec in ('flow_classifier', 'network', 'server'):
+        for sec in ('flow_classifier', 'network', 'server_chain'):
             if sec not in sfc_conf:
                 raise ConfigError('Missing %s configs in SFC section!' % sec)
         return sfc_conf
@@ -92,19 +96,19 @@ class ConfigHolder(object):
         return self._get_sfc_conf()['network']
 
     def get_sfc_server(self):
-        """Get a list of FC servers
+        """Get server chain
 
         :retype: list
         """
-        srv_conf = self._get_sfc_conf()['server']
-        # TODO: Should be better...
-        srv_lst = [0] * len(srv_conf)
+        srv_conf = self._get_sfc_conf()['server_chain']
+        # TODO: Add support for server group
+        srv_grp_lst = [0] * len(srv_conf)
         for srv, conf in srv_conf.items():
             conf['name'] = srv
-            if srv_lst[conf['seq_num'] - 1] != 0:
+            if srv_grp_lst[conf['seq_num'] - 1] != 0:
                 raise ConfigError('Duplicated server sequence number')
-            srv_lst[conf['seq_num'] - 1] = conf
-        return srv_lst
+            srv_grp_lst[conf['seq_num'] - 1] = [conf]
+        return srv_grp_lst
 
 
 class ConfigParser(object):
