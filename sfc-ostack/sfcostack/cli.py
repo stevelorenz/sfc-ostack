@@ -49,7 +49,7 @@ def cli():
         logger.info('Create the SFC, config file path: %s' % args.conf_path)
         srv_chain = resource.ServerChain(auth_args, fc_conf['name'],
                                          fc_conf['description'],
-                                         net_conf, srv_queue, True)
+                                         net_conf, srv_queue, False, 'pt_in')
         srv_chain.create()
         port_chain = resource.PortChain(auth_args, fc_conf['name'],
                                         fc_conf['description'],
@@ -60,7 +60,7 @@ def cli():
         logger.info('Delete the SFC, config file: %s' % args.conf_path)
         srv_chain = resource.ServerChain(auth_args, fc_conf['name'],
                                          fc_conf['description'],
-                                         net_conf, srv_queue, True)
+                                         net_conf, srv_queue, False)
         port_chain = resource.PortChain(auth_args, fc_conf['name'],
                                         fc_conf['description'],
                                         srv_chain, flow_conf)

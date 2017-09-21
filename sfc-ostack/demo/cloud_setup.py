@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 """
@@ -21,8 +21,8 @@ def pre_build_topo():
     """pre_build_topo"""
 
     auth_args = {
-        # 'auth_url': 'http://192.168.100.1/identity/v3',
-        'auth_url': 'http://192.168.0.100/identity/v3',
+        'auth_url': 'http://192.168.100.1/identity/v3',
+        # 'auth_url': 'http://192.168.0.100/identity/v3',
         'project_name': 'admin',
         'user_domain_name': 'default',
         'project_domain_name': 'default',

@@ -58,8 +58,8 @@ class ServerChain(object):
     """
 
     def __init__(self, auth_args, name, desc,
-                 net_conf, srv_grp_lst,
-                 ssh_port=False, ssh_conf=False):
+                 net_conf, srv_grp_lst, sep_access_port=False,
+                 fip_port=None):
         """Init server chain object
 
         :param auth_args:
@@ -67,8 +67,8 @@ class ServerChain(object):
         :param desc: Description
         :param net_conf: Network configs
         :param srv_grp_lst (list): A list of server groups
-        :param ssh_port (Bool):
-        :param ssh_conf (Bool):
+        :param sep_access_port (Bool)
+        :param fip_port (str):
         """
         self.logger = logging.getLogger(__name__)
 
@@ -76,9 +76,8 @@ class ServerChain(object):
         self.desc = desc
         self.net_conf = net_conf
         self.srv_grp_lst = deque(srv_grp_lst)
-        self.ssh_port = ssh_port
-        # MARK: depreciated feature
-        self.ssh_conf = ssh_conf
+        self.sep_access_port = sep_access_port
+        self.fip_port = fip_port
 
         self.conn = connection.Connection(**auth_args)
         # MARK: Since there is no examples for usage of the orchestration
@@ -96,14 +95,12 @@ class ServerChain(object):
         pubnet = self.conn.network.find_network('public')
         net = self.conn.network.find_network(self.net_conf['net_name'])
         subnet = self.conn.network.find_subnet(self.net_conf['subnet_name'])
-        sec_grp = self.conn.network.find_security_group(
-            self.net_conf['security_group_name'])
+        # TODO: Add support for security group
 
         self.network_id = {
             'public': pubnet.id,
             'net': net.id,
-            'subnet': subnet.id,
-            'sec_grp': sec_grp.id
+            'subnet': subnet.id
         }
 
     # MARK: current not used
@@ -117,7 +114,6 @@ class ServerChain(object):
         :param timeout (float): Timeout for connection error
         """
         subnet = self.conn.network.find_subnet(self.net_conf['subnet_name'])
-        ssh_conf = srv['ssh']
         ssh_clt = paramiko.SSHClient()
         # Allow connection not in the known_host
         ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -126,8 +122,8 @@ class ServerChain(object):
         while not succ:
             try:
                 succ = 1
-                ssh_clt.connect(ip, port, ssh_conf['user_name'],
-                                key_filename=ssh_conf['pvt_key_file'])
+                ssh_clt.connect(ip, port, self.ssh_conf['user_name'],
+                                key_filename=self.ssh_conf['pvt_key_file'])
             except paramiko.ssh_exception.NoValidConnectionsError as error:
                 succ = 0
                 time.sleep(interval)
@@ -159,11 +155,10 @@ class ServerChain(object):
         prop = dict()
 
         # MARK: CAN be better... relative straight forward
-        if self.ssh_port:
+        if self.sep_access_port:
             port_suffix = ('pt', 'pt_in', 'pt_out')
         else:
             port_suffix = ('pt_in', 'pt_out')
-
         for srv_grp in self.srv_grp_lst:
             for srv in srv_grp:
                 networks = list()
@@ -175,32 +170,40 @@ class ServerChain(object):
                         'network_id': self.network_id['net'],
                         # A list of subnet IDs
                         'fixed_ips': [{'subnet_id': self.network_id['subnet']}],
-                        # A list of security groups
-                        'security_groups': [self.network_id['sec_grp']]
+                        # TODO: Add support for security group
+                        # 'security_groups': [self.network_id['sec_grp']]
                     }
                     networks.append(
                         {'port': '{ get_resource: %s }' % port_name})
                     hot_cont.resource_lst.append(
                         hot.Resource(port_name, 'port', prop))
 
-                if self.ssh_port:
-                    # Floating IP for SSH port
+                if self.fip_port:
                     prop = {
                         'floating_network': self.network_id['public'],
-                        'port_id': '{ get_resource: %s }' % (srv['name'] + '_pt')
                     }
+                    if self.fip_port == 'pt':
+                        prop['port_id'] = '{ get_resource: %s }' % (
+                            srv['name'] + '_pt')
+                    elif self.fip_port == 'pt_in':
+                        prop['port_id'] = '{ get_resource: %s }' % (
+                            srv['name'] + '_pt_in')
+                    elif self.fip_port == 'pt_out':
+                        prop['port_id'] = '{ get_resource: %s }' % (
+                            srv['name'] + '_pt_out')
+                    else:
+                        raise ServerChainError('Invalid floating IP port!')
+
                     hot_cont.resource_lst.append(
                         hot.Resource(srv['name'] + '_fip', 'fip', prop))
 
                 prop = {
                     'name': srv['name'],
-                    # 'key_name': srv['ssh']['pub_key_name'],
                     'image': srv['image'],
                     'flavor': srv['flavor'],
-                    'networks': networks
+                    'networks': networks,
+                    'key_name': srv['ssh']['pub_key_name']
                 }
-                if self.ssh_port:
-                    prop.update({'key_name': srv['ssh']['pub_key_name']})
 
                 # MARK: Use RAW bash script
                 if srv['init_script']:
