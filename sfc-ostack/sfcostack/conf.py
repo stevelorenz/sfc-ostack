@@ -101,6 +101,8 @@ class ConfigHolder(object):
         :retype: list
         """
         srv_conf = self._get_sfc_conf()['server_chain']
+        if not srv_conf:
+            return []
         # TODO: Add support for server group
         srv_grp_lst = [0] * len(srv_conf)
         for srv, conf in srv_conf.items():

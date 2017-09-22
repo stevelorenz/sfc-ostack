@@ -4,17 +4,18 @@
 
 """
 About: SFC operator only for testing
+MARK : Really Bad codes... MUST be improved latter
 
 Email: xianglinks@gmail.com
 """
 
 import sys
+import time
 
 from sfcostack import conf
-
+from sfcostack.sfc import resource
 
 SERVER = {
-    'name': 'chnX',
     'image': 'ubuntu-cloud',
     'flavor': 'sfc_test',
     'init_script': './forwarding.sh',
@@ -26,14 +27,6 @@ SERVER = {
 }
 
 
-def create_sfc():
-    pass
-
-
-def delete_sfc():
-    pass
-
-
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print('Missing options!')
@@ -43,15 +36,40 @@ if __name__ == "__main__":
     auth_args = conf_hd.get_cloud_auth()
     flow_conf = conf_hd.get_sfc_flow()
     net_conf = conf_hd.get_sfc_net()
-    srv_queue = conf_hd.get_sfc_server()
+    srv_queue = []
     fc_conf = conf_hd.get_sfc_fc()
 
     opt = sys.argv[1]
 
     if opt == 'c' or opt == 'create':
-        chn_num = sys.argv[2]
+        chn_num = int(sys.argv[2])
         print('Create SFC with %s chain nodes' % chn_num)
 
+        for idx in range(1, chn_num + 1):
+            SERVER['name'] = 'chn%s' % idx
+            srv_queue.append([SERVER.copy()])
+
+        srv_chain = resource.ServerChain(auth_args, fc_conf['name'],
+                                         fc_conf['description'],
+                                         net_conf, srv_queue, False, 'pt_in')
+        srv_chain.create()
+        port_chain = resource.PortChain(auth_args, fc_conf['name'],
+                                        fc_conf['description'],
+                                        srv_chain, flow_conf)
+
     elif opt == 'd' or opt == 'delete':
-        chn_num = sys.argv[2]
+        chn_num = int(sys.argv[2])
         print('Delete SFC with %s chain nodes' % chn_num)
+
+        for idx in range(1, chn_num + 1):
+            SERVER['name'] = 'chn%s' % idx
+            srv_queue.append([SERVER.copy()])
+
+        srv_chain = resource.ServerChain(auth_args, fc_conf['name'],
+                                         fc_conf['description'],
+                                         net_conf, srv_queue, False)
+        port_chain = resource.PortChain(auth_args, fc_conf['name'],
+                                        fc_conf['description'],
+                                        srv_chain, flow_conf)
+        port_chain.delete()
+        srv_chain.delete()

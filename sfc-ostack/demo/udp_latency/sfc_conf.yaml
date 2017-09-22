@@ -41,14 +41,5 @@ SFC:
     # security_group_name: sfc_test
 
   server_chain:
-    chn1:
-      seq_num: 1
-      image: ubuntu-cloud
-      flavor: sfc_test
-      init_script: ./forwarding.sh
-      ssh:
-        user_name: ubuntu
-        pub_key_name: sfc_test
-        pvt_key_file: ./sfc_test.pem
 
 ...
