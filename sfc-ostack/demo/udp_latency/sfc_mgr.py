@@ -18,7 +18,7 @@ from sfcostack.sfc import resource
 SERVER = {
     'image': 'ubuntu-cloud',
     'flavor': 'sfc_test',
-    'init_script': './forwarding.sh',
+    # 'init_script': './forwarding.sh',
     'ssh': {
         'user_name': 'ubuntu',
         'pub_key_name': 'sfc_test',
@@ -51,11 +51,12 @@ if __name__ == "__main__":
 
         srv_chain = resource.ServerChain(auth_args, fc_conf['name'],
                                          fc_conf['description'],
-                                         net_conf, srv_queue, False, 'pt_in')
+                                         net_conf, srv_queue, True, 'pt')
         srv_chain.create()
         port_chain = resource.PortChain(auth_args, fc_conf['name'],
                                         fc_conf['description'],
                                         srv_chain, flow_conf)
+        port_chain.create()
 
     elif opt == 'd' or opt == 'delete':
         chn_num = int(sys.argv[2])
@@ -67,7 +68,7 @@ if __name__ == "__main__":
 
         srv_chain = resource.ServerChain(auth_args, fc_conf['name'],
                                          fc_conf['description'],
-                                         net_conf, srv_queue, False)
+                                         net_conf, srv_queue, True)
         port_chain = resource.PortChain(auth_args, fc_conf['name'],
                                         fc_conf['description'],
                                         srv_chain, flow_conf)

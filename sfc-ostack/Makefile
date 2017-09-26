@@ -7,9 +7,10 @@ PIP_REQUIREMENTS = './requirements.txt'
 PIP_REQUIREMENTS_DEV = './dev_requirements.txt'
 
 PYTMP = $(shell find ./ -path './venv' -prune -o -name '*.pyc' -o -name '__pycache__' -print)
-TMP = $(PYTMP)
+TMP = $(PYTMP) './sfc_ostack.egg-info' './dist'
 
 PYSRC = $(shell find ./ -path './venv' -prune -o -name '*.py' -print)
+BASHSRC= $(shell find ./ -path './venv' -prune -o -name '*.sh' -print)
 
 LOCAL_HOST="stack@127.0.0.1"
 # local github repo
@@ -37,6 +38,10 @@ stat-src:
 	@echo "# Statistics of all python src:"
 	@echo "- Line numbers: "
 	@wc -l $(PYSRC)
+	@echo ""
+	@echo "# Statistics of all bash src:"
+	@echo "- Line numbers: "
+	@wc -l $(BASHSRC)
 
 clean-tmp:
 	@echo "Run cleanups..."

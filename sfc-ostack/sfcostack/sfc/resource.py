@@ -67,8 +67,12 @@ class ServerChain(object):
         :param desc: Description
         :param net_conf: Network configs
         :param srv_grp_lst (list): A list of server groups
-        :param sep_access_port (Bool)
-        :param fip_port (str):
+        :param sep_access_port (Bool): If True, a separate port is created for
+                                       remote access
+        :param fip_port (str): Indicate which port to bind the floating IP
+                               pt: sep_access_port
+                               pt_in: ingress port
+                               pt_out: egress port
         """
         self.logger = logging.getLogger(__name__)
 
@@ -201,12 +205,14 @@ class ServerChain(object):
                     'name': srv['name'],
                     'image': srv['image'],
                     'flavor': srv['flavor'],
-                    'networks': networks,
-                    'key_name': srv['ssh']['pub_key_name']
+                    'networks': networks
                 }
 
-                # MARK: Use RAW bash script
-                if srv['init_script']:
+                if srv.get('ssh', None):
+                    prop['key_name'] = srv['ssh']['pub_key_name']
+
+                # MARK: Only test RAW bash script
+                if srv.get('init_script', None):
                     with open(srv['init_script'], 'r') as f:
                         # MARK: | is needed after user_data
                         prop.update(
@@ -228,20 +234,20 @@ class ServerChain(object):
                          self.name)
         self.heat_client.stacks.create(stack_name=self.name,
                                        template=hot_str)
+        if timeout:
+            if wait_complete:
+                total_time = 0
+                while total_time < timeout:
+                    sc_stack = self.conn.orchestration.find_stack(self.name)
+                    if not sc_stack:
+                        continue
+                    elif sc_stack.status == 'CREATE_COMPLETE':
+                        return
+                    else:
+                        total_time += interval
 
-        if wait_complete:
-            total_time = 0
-            while total_time < timeout:
-                sc_stack = self.conn.orchestration.find_stack(self.name)
-                if not sc_stack:
-                    continue
-                elif sc_stack.status == 'CREATE_COMPLETE':
-                    return
-                else:
-                    total_time += interval
-
-            raise SFCRscError(
-                'Creation of server chain:%s timeout!' % self.name)
+                raise SFCRscError(
+                    'Creation of server chain:%s timeout!' % self.name)
 
     def delete(self, wait_complete=True, interval=3, timeout=600):
         self.logger.info('Delete server chain using HEAT, stacks name: %s' %
@@ -252,19 +258,20 @@ class ServerChain(object):
                               self.name)
         self.conn.orchestration.delete_stack(sc_stack)
 
-        if wait_complete:
-            total_time = 0
-            while total_time < timeout:
-                sc_stack = self.conn.orchestration.find_stack(self.name)
-                if not sc_stack:
-                    continue
-                elif sc_stack.status == 'DELETE_COMPLETE':
-                    return
-                else:
-                    total_time += interval
+        if timeout:
+            if wait_complete:
+                total_time = 0
+                while total_time < timeout:
+                    sc_stack = self.conn.orchestration.find_stack(self.name)
+                    if not sc_stack:
+                        continue
+                    elif sc_stack.status == 'DELETE_COMPLETE':
+                        return
+                    else:
+                        total_time += interval
 
-            raise SFCRscError(
-                'Deletion of server chain:%s timeout!' % self.name)
+                raise SFCRscError(
+                    'Deletion of server chain:%s timeout!' % self.name)
 
     # --- ServerChain Parameters ---
 
@@ -311,10 +318,9 @@ class PortChain(object):
     Handles flow classifier, port pair, port pair group and port chain.
 
     Naming Pattern:
-        pp_grp_1
-        pp_1_1
-
-    TODO:
+        Port Pair: pp_(port pair group index)_(port pair index) e.g. pp_1_1
+        Port Pair Group: pp_grp_(port pair group index) e.g. pp_grp_1
+        Port Chain: Get name from user config
     """
 
     def __init__(self, auth_args, name, desc,
@@ -407,6 +413,11 @@ class PortChain(object):
 
         self.logger.info('Delete flow classifier.')
         self.pc_client.delete('flow_classifier', self.flow_conf['name'])
+
+
+# TODO: Add Mininet net liked SFC resource object
+class SFC(object):
+    pass
 
 
 if __name__ == "__main__":
