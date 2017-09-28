@@ -213,6 +213,8 @@ class ServerChain(object):
 
                 # MARK: Only test RAW bash script
                 if srv.get('init_script', None):
+                    self.logger.info('Read the init bash script: %s'
+                                     % srv['init_script'])
                     with open(srv['init_script'], 'r') as f:
                         # MARK: | is needed after user_data
                         prop.update(

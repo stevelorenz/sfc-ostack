@@ -50,7 +50,7 @@ clean-tmp:
 
 sync-bitbucket-local:
 	@echo "Sync codes to local bitbucket repo..."
-	rsync -rav --exclude="venv" --delete $(LOCAL_GH) $(LOCAL_HOST):$(LOCAL_BB)
+	rsync -rav --exclude="venv" --progress --delete $(LOCAL_GH) $(LOCAL_HOST):$(LOCAL_BB)
 
 sync-github-local:
 	@echo "Sync codes to local github repo..."
@@ -58,7 +58,7 @@ sync-github-local:
 
 upload-test-server:
 	@echo "Upload to the test server: $(TEST_SERVER)"
-	rsync -rav -e ssh --exclude="venv" --delete $(LOCAL_GH) $(TEST_SERVER):$(REMOTE_LOC)
+	rsync -rav -e ssh --exclude="venv" --progress --delete $(LOCAL_GH) $(TEST_SERVER):$(REMOTE_LOC)
 
 save_pkgs:
 	@echo "Save installed pip packages in $(PIP_REQUIREMENTS)"

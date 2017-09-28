@@ -28,7 +28,7 @@ NUM_PACKETS = 10000
 MAX_FS_NUM = 9
 
 base_file_name = '-'.join(
-    map(str, (NUM_PACKETS, SEND_RATE, PAYLOAD_LEN))
+    map(str, ('lkf', NUM_PACKETS, SEND_RATE, PAYLOAD_LEN))
 )
 
 T_FACTOR = 2.678  # 99% for two sided

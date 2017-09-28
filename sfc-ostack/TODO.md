@@ -1,5 +1,4 @@
 # TODO List #
 
-- Add SFC manager
-- FC Monitoring
-- Improve the SFC manager performance
+- Add SFC resource and examples
+- Add docs for init_scripts and configuration files

@@ -159,7 +159,7 @@ def run_server(ip, port):
         try:
             data, recv_addr = sock_in.recvfrom(SERVER_BUFFER_SIZE)
             logger.debug('Receive packet %d from client: %s:%d' %
-                         (packet_n, ip, port))
+                         (packet_n, recv_addr[0], recv_addr[1]))
             packet_n += 1
             if not data:
                 print('Empty data received, exit...')
