@@ -49,7 +49,14 @@ function py_forwarding_test {
         python "$SFC_MGR" c "$srv_num"
         # Immer langsamer bitte...
         sleep 15
-        # Copy forwarding program to all instances
+        rm ~/.ssh/known_hosts
+
+        for (( i = 1; i <= $MAX_SF_NUM; i++ )); do
+            FIP=$(openstack )
+            # Copy forwarding program to all instances
+            scp -o StrictHostKeyChecking=no -i /home/zuo/sfc_ostack_test/sfc_test.pem "ubuntu@$FIP"
+        done
+
 
         # Run forwarding program
 

@@ -18,7 +18,7 @@ from sfcostack.sfc import resource
 SERVER = {
     'image': 'ubuntu-cloud',
     'flavor': 'sfc_test',
-    'init_script': './init_py_forwarding',
+    'init_script': './init_py_forwarding.sh',
     'ssh': {
         'user_name': 'ubuntu',
         'pub_key_name': 'sfc_test',
