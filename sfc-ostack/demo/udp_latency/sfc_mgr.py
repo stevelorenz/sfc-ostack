@@ -15,18 +15,6 @@ import time
 from sfcostack import conf
 from sfcostack.sfc import resource
 
-SERVER = {
-    'image': 'ubuntu-cloud',
-    'flavor': 'sfc_test',
-    'init_script': './init_py_forwarding.sh',
-    'ssh': {
-        'user_name': 'ubuntu',
-        'pub_key_name': 'sfc_test',
-        'pvt_key_file': './sfc_test.pem'
-    }
-}
-
-
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print('Missing options!')
@@ -39,10 +27,22 @@ if __name__ == "__main__":
     srv_queue = []
     fc_conf = conf_hd.get_sfc_fc()
 
-    opt = sys.argv[1]
+    init_script = sys.argv[1]
+    SERVER = {
+        'image': 'ubuntu-cloud',
+        'flavor': 'sfc_test',
+        'init_script': init_script,
+        'ssh': {
+            'user_name': 'ubuntu',
+            'pub_key_name': 'sfc_test',
+            'pvt_key_file': './sfc_test.pem'
+        }
+    }
+
+    opt = sys.argv[2]
 
     if opt == 'c' or opt == 'create':
-        chn_num = int(sys.argv[2])
+        chn_num = int(sys.argv[3])
         print('Create SFC with %s chain nodes' % chn_num)
 
         for idx in range(1, chn_num + 1):
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         port_chain.create()
 
     elif opt == 'd' or opt == 'delete':
-        chn_num = int(sys.argv[2])
+        chn_num = int(sys.argv[3])
         print('Delete SFC with %s chain nodes' % chn_num)
 
         for idx in range(1, chn_num + 1):

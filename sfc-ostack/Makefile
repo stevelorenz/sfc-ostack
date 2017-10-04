@@ -27,7 +27,7 @@ all:
 lint-src:
 	@echo "Lint all python src with flake8..."
 	@flake8 --exclude ./venv --ignore=E501,F401,E402,F841 \
-		--show-source --statistics --max-complexity=10 --exit-zero \
+		--show-source --statistics --max-complexity=15 --exit-zero \
 		$(PYSRC)
 
 format-src:

@@ -15,61 +15,67 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-###############
-#  Data Proc  #
-###############
-
 BASE_PATH = './test_result/'
 
 SEND_RATE = 1000  # byte/s
 PAYLOAD_LEN = 512  # byte
 NUM_PACKETS = 10000
 
-MAX_FS_NUM = 9
+MAX_FS_NUM = 6
 
-base_file_name = '-'.join(
-    map(str, ('lkf', NUM_PACKETS, SEND_RATE, PAYLOAD_LEN))
-)
+
+font_size = 10
+font_name = 'monospace'
+
+fig, ax = plt.subplots()
+
+# fig.suptitle('Latency(RTT) for UDP Packets', fontsize=13)
+ax.set_title("Service Function: Simple IP Forwarding", fontsize=font_size + 1)
+
+x = np.arange(0, MAX_FS_NUM + 1, 1, dtype='int32')
+width = 0.35
 
 T_FACTOR = 2.678  # 99% for two sided
 
-lat_avg_lst = []
-lat_hwci_lst = []
-for srv_num in range(0, MAX_FS_NUM + 1):
-    csv_path = os.path.join(BASE_PATH,
-                            base_file_name + '-%d.csv' % srv_num)
-    data = np.genfromtxt(csv_path, delimiter=',')
-    lat = data[1:, 1] / 1000.0
-    lat_avg_lst.append(np.average(lat))
-    lat_std = np.std(lat)
-    # Calc empirical std
-    emp_lat_std = (
-        np.sqrt(float(NUM_PACKETS - 1)) / (NUM_PACKETS - 2)
-    ) * lat_std
-    lat_hwci = (T_FACTOR * emp_lat_std) / np.sqrt(NUM_PACKETS - 1)
-    lat_hwci_lst.append(lat_hwci)
+for method, color, label, pos in zip(
+    ('lkf', 'pyf'), ('blue', 'green'),
+    ('Kernel forwarding', 'Python forwarding'),
+    (0, width)
+):
+    base_file_name = '-'.join(
+        map(str, (method, NUM_PACKETS, SEND_RATE, PAYLOAD_LEN))
+    )
+    lat_avg_lst = []
+    lat_hwci_lst = []
+    for srv_num in range(0, MAX_FS_NUM + 1):
+        csv_path = os.path.join(BASE_PATH,
+                                base_file_name + '-%d.csv' % srv_num)
+        data = np.genfromtxt(csv_path, delimiter=',')
+        lat = data[1:, 1] / 1000.0
+        lat_avg_lst.append(np.average(lat))
+        lat_std = np.std(lat)
+        # Calc empirical std
+        emp_lat_std = (
+            np.sqrt(float(NUM_PACKETS - 1)) / (NUM_PACKETS - 2)
+        ) * lat_std
+        lat_hwci = (T_FACTOR * emp_lat_std) / np.sqrt(NUM_PACKETS - 1)
+        lat_hwci_lst.append(lat_hwci)
 
-##################
-#  Plot Results  #
-##################
+    y = lat_avg_lst
 
-plt.suptitle('Latency(RTT) for UDP Packets', fontsize=13)
+    ax.plot(x + pos + width / 2, y,
+            marker='o', markerfacecolor='None', markeredgewidth=1,
+            markeredgecolor=color, color=color, lw=1, ls='--')
 
-ax1 = plt.subplot(1, 1, 1)
-plt.title("Network Function: Simple IP Forwarding", fontsize=9)
-x = np.arange(0, MAX_FS_NUM + 1, 1, dtype='int32')
-y = lat_avg_lst
-# plt.errorbar(x, y, yerr=lat_hwci_lst,
-# marker='o', markerfacecolor='None', markeredgewidth=1,
-# markeredgecolor='black', color='black', lw=1, ls='-')
-plt.plot(x, y,
-         marker='o', markerfacecolor='None', markeredgewidth=1,
-         markeredgecolor='black', color='black', lw=1, ls='-')
-plt.xlabel("Number of chained SF-servers", fontsize=10)
-plt.xticks(range(0, MAX_FS_NUM + 2))
-plt.ylabel("RTT (ms)", fontsize=10)
-# handles, labels = ax1.get_legend_handles_labels()
-# ax1.legend(handles, labels, fontsize=8)
-plt.grid()
+    ax.bar(x + pos, y, width, label=label, color=color)
 
-plt.savefig('./udp_latency_result.png', dpi=300)
+ax.set_xlabel("Number of chained SF-servers",
+              fontsize=font_size)
+ax.set_xticks(x + width)
+ax.set_xticklabels(x)
+ax.set_ylabel("RTT (ms)", fontsize=font_size)
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles, labels, fontsize=font_size - 2, loc='upper left')
+ax.grid()
+
+fig.savefig('./udp_latency_result.png', dpi=500)

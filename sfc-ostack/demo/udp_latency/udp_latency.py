@@ -52,7 +52,7 @@ def recv_packets(port, n_packets, payload_len, output_file):
                             socket.IPPROTO_UDP)
     sock_in.bind(('', port))
     logger.debug('Client bind port %d' % port)
-    sock_in.settimeout(10)
+    sock_in.settimeout(600)  # MARK: 10 mins
 
     rev_packets = []
     try:
@@ -74,7 +74,7 @@ def recv_packets(port, n_packets, payload_len, output_file):
     sock_in.close()
     # Save latency in a csv file
     with open(output_file, 'w') as out_file:
-        out_file.write("%d\n" % n_packets)
+        # out_file.write("%d\n" % n_packets)
         for tup in rev_packets:
             packet_n = tup[0]
             latency = "%.2f" % tup[1]

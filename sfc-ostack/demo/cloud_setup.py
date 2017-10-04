@@ -22,7 +22,6 @@ def pre_build_topo():
 
     auth_args = {
         'auth_url': 'http://192.168.100.1/identity/v3',
-        # 'auth_url': 'http://192.168.0.100/identity/v3',
         'project_name': 'admin',
         'user_domain_name': 'default',
         'project_domain_name': 'default',
