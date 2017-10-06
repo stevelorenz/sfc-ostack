@@ -24,6 +24,7 @@ NUM_PACKETS = '10000'
 SEND_RATE = '1000'  # byte/s
 PAYLOAD_LEN = '512'  # byte
 
+SFC_CONF = './sfc_conf.yaml'
 SSH_PKEY = '/home/zuo/sfc_ostack_test/sfc_test.pem'
 
 DROPBOX_TOOL = '~/bin/dbxcli-linux-amd64'
@@ -52,8 +53,10 @@ def py_forwarding_test():
     print('[TEST] Test UDP RTT with python forwarding.')
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
         print('[TEST] Create %d SF servers' % srv_num)
-        subprocess.run(['python3', './sfc_mgr.py', INIT_SCRIPT,
-                        'c', '%d' % srv_num], check=True)
+        subprocess.run(
+            ['python3', '../sfc_mgr.py', SFC_CONF,
+                INIT_SCRIPT, 'create', '%d' % srv_num],
+            check=True)
         time.sleep(10)
         try:
             os.remove('/home/zuo/.ssh/known_hosts')
@@ -96,7 +99,6 @@ def py_forwarding_test():
                 time.sleep(3)
             sftp_clt.close()
             ssh_clt.close()
-
         # Run UDP client
         time.sleep(30)
         print('[TEST] Run UDP client')
@@ -110,8 +112,10 @@ def py_forwarding_test():
                         ],
                        check=True)
         time.sleep(30)
-        subprocess.run(['python3', './sfc_mgr.py', INIT_SCRIPT,
-                        'd', '%d' % srv_num], check=True)
+        subprocess.run(
+            ['python3', '../sfc_mgr.py', SFC_CONF,
+                INIT_SCRIPT, 'delete', '%d' % srv_num],
+            check=True)
 
 
 def lk_forwarding_test():
@@ -119,8 +123,10 @@ def lk_forwarding_test():
     print('[TEST] Test UDP RTT with kernel forwarding.')
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
         print('[TEST] Create %d SF servers' % srv_num)
-        subprocess.run(['python3', './sfc_mgr.py', INIT_SCRIPT,
-                        'c', '%d' % srv_num], check=True)
+        subprocess.run(
+            ['python3', '../sfc_mgr.py', SFC_CONF,
+                INIT_SCRIPT, 'create', '%d' % srv_num],
+            check=True)
         time.sleep(5)
         # Run UDP client
         time.sleep(5)
@@ -135,8 +141,10 @@ def lk_forwarding_test():
                         ],
                        check=True)
         time.sleep(5)
-        subprocess.run(['python3', './sfc_mgr.py', INIT_SCRIPT,
-                        'd', '%d' % srv_num], check=True)
+        subprocess.run(
+            ['python3', '../sfc_mgr.py', SFC_CONF,
+                INIT_SCRIPT, 'delete', '%d' % srv_num],
+            check=True)
 
 
 if __name__ == "__main__":
@@ -151,7 +159,6 @@ if __name__ == "__main__":
         ap.print_help()
         sys.exit()
     args = ap.parse_args()
-    print(args)
 
     # Minimal and maximal number of SF instances
     MIN_SF_NUM = int(args.min_sf)

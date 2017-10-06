@@ -1,0 +1,118 @@
+#
+# About: Basic topo for UDP latency measurement
+#
+# Topo:
+#   Public Net: [ public ]
+#       |
+#
+#       |
+#   { Router }
+#       |
+#       |
+#   Private Net: [ net/subnet ]
+#       |
+#       |
+#   server_vm
+
+heat_template_version: 2017-02-24  # stable/ocata
+
+description: Basic topo for UDP latency measurement
+
+parameters:
+
+  pub_net:
+    type: string
+    label: public network
+    description: >
+      ID or name of public network for which floating IP addresses will be allocated
+
+resources:
+
+  # --- Network ----
+
+  pvt_net:
+    type: OS::Neutron::Net
+    properties:
+      admin_state_up: True
+      name: net1
+      # MARK: Need to understand....
+      port_security_enabled: False
+      shared: True
+
+  pvt_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: subnet1
+      network_id: { get_resource: pvt_net }
+      cidr: 10.0.0.0/24
+      gateway_ip: 10.0.0.1
+      dns_nameservers: [ 141.30.1.1 ]
+
+  # --- Ports ----
+
+  src_pt:
+    type: OS::Neutron::Port
+    properties:
+      name: src_pt
+      network_id: { get_resource: pvt_net }
+      # security_groups: [ sfc_test ]
+      fixed_ips:
+        - subnet_id: { get_resource: pvt_subnet }
+
+  dst_pt:
+    type: OS::Neutron::Port
+    properties:
+      name: dst_pt
+      network_id: { get_resource: pvt_net }
+      # security_groups: [ sfc_test ]
+      fixed_ips:
+        - subnet_id: { get_resource: pvt_subnet }
+
+  # --- Router ---
+
+  dft_router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: public }
+
+  subnet1_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: dft_router }
+      subnet: { get_resource: pvt_subnet }
+
+  # --- Floating IP ---
+
+  src_fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: pub_net }
+      port_id: { get_resource: src_pt }
+
+  dst_fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: pub_net }
+      port_id: { get_resource: dst_pt }
+
+  # --- Instance ----
+
+  src:
+    type: OS::Nova::Server
+    properties:
+      name: src
+      key_name: sfc_test
+      image: ubuntu-cloud
+      flavor: sfc_test
+      networks:
+        - port: { get_resource: src_pt}
+
+  dst:
+    type: OS::Nova::Server
+    properties:
+      name: dst
+      key_name: sfc_test
+      image: ubuntu-cloud
+      flavor: sfc_test
+      networks:
+        - port: { get_resource: dst_pt }

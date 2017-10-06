@@ -14,6 +14,7 @@ import os
 import numpy as np
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 BASE_PATH = './test_result/'
 
@@ -21,16 +22,20 @@ SEND_RATE = 1000  # byte/s
 PAYLOAD_LEN = 512  # byte
 NUM_PACKETS = 10000
 
-MAX_FS_NUM = 6
+MAX_FS_NUM = 10
 
 
 font_size = 10
-font_name = 'monospace'
+# Match the latex template
+font_name = 'Universalis ADF Cd Std'
+
+mpl.rc('font', family=font_name)
 
 fig, ax = plt.subplots()
 
 # fig.suptitle('Latency(RTT) for UDP Packets', fontsize=13)
-ax.set_title("Service Function: Simple IP Forwarding", fontsize=font_size + 1)
+ax.set_title("Service Function: Simple IP Forwarding", fontsize=font_size + 1,
+             fontname=font_name)
 
 x = np.arange(0, MAX_FS_NUM + 1, 1, dtype='int32')
 width = 0.35
@@ -70,12 +75,16 @@ for method, color, label, pos in zip(
     ax.bar(x + pos, y, width, label=label, color=color)
 
 ax.set_xlabel("Number of chained SF-servers",
-              fontsize=font_size)
+              fontsize=font_size, fontname=font_name)
 ax.set_xticks(x + width)
-ax.set_xticklabels(x)
-ax.set_ylabel("RTT (ms)", fontsize=font_size)
+ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+ax.set_xlim(0, 11)
+ax.set_yticks(range(0, 7))
+ax.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
+ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
 handles, labels = ax.get_legend_handles_labels()
-ax.legend(handles, labels, fontsize=font_size - 2, loc='upper left')
+ax.legend(handles, labels, fontsize=font_size,
+          loc='upper left')
 ax.grid()
 
-fig.savefig('./udp_latency_result.png', dpi=500)
+fig.savefig('./udp_latency_rtt_result.png', dpi=500)

@@ -3,12 +3,14 @@
 # vim:fenc=utf-8
 
 """
-About: SFC operator only for testing
+About: Simple manager only used for SFC evaluation tests
+
 MARK : Really Bad codes... MUST be improved latter
 
 Email: xianglinks@gmail.com
 """
 
+import argparse
 import sys
 import time
 
@@ -16,22 +18,32 @@ from sfcostack import conf
 from sfcostack.sfc import resource
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print('Missing options!')
-        sys.exit(0)
+    ap = argparse.ArgumentParser(
+        description='SFC manager only used for SFC evaluation tests'
+    )
+    ap.add_argument('conf_file', help='Path of the sfc config file', type=str)
+    ap.add_argument('init_script', help='Path of init-script for SF instances')
+    ap.add_argument('operation', help='Chain operation', type=str,
+                    choices=['create', 'delete'])
+    ap.add_argument('sf_num', help='Number of SF instances', type=int)
 
-    conf_hd = conf.ConfigHolder('yaml', './sfc_conf.yaml')
+    if len(sys.argv) == 1:
+        ap.print_help()
+        sys.exit()
+    args = ap.parse_args()
+
+    conf_hd = conf.ConfigHolder('yaml', args.conf_file)
     auth_args = conf_hd.get_cloud_auth()
     flow_conf = conf_hd.get_sfc_flow()
     net_conf = conf_hd.get_sfc_net()
+
     srv_queue = []
     fc_conf = conf_hd.get_sfc_fc()
 
-    init_script = sys.argv[1]
     SERVER = {
         'image': 'ubuntu-cloud',
         'flavor': 'sfc_test',
-        'init_script': init_script,
+        'init_script': args.init_script,
         'ssh': {
             'user_name': 'ubuntu',
             'pub_key_name': 'sfc_test',
@@ -39,13 +51,11 @@ if __name__ == "__main__":
         }
     }
 
-    opt = sys.argv[2]
-
+    opt = args.operation
+    sf_num = args.sf_num
     if opt == 'c' or opt == 'create':
-        chn_num = int(sys.argv[3])
-        print('Create SFC with %s chain nodes' % chn_num)
-
-        for idx in range(1, chn_num + 1):
+        print('[TEST] Create SFC with %s chain nodes' % sf_num)
+        for idx in range(1, sf_num + 1):
             SERVER['name'] = 'chn%s' % idx
             srv_queue.append([SERVER.copy()])
 
@@ -59,10 +69,8 @@ if __name__ == "__main__":
         port_chain.create()
 
     elif opt == 'd' or opt == 'delete':
-        chn_num = int(sys.argv[3])
-        print('Delete SFC with %s chain nodes' % chn_num)
-
-        for idx in range(1, chn_num + 1):
+        print('[TEST] Delete SFC with %s chain nodes' % sf_num)
+        for idx in range(1, sf_num + 1):
             SERVER['name'] = 'chn%s' % idx
             srv_queue.append([SERVER.copy()])
 

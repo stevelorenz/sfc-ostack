@@ -8,12 +8,12 @@ Email : xianglinks@gmail.com
 """
 
 import argparse
+import logging
 import multiprocessing
 import pickle
 import socket
 import sys
 import time
-import logging
 
 fmt_str = '%(asctime)s %(levelname)-8s %(message)s'
 level = {
@@ -65,11 +65,11 @@ def recv_packets(port, n_packets, payload_len, output_file):
             latency_us = (recv_time_stmp - send_time_stmp) * 1e6
             rev_packets.append((packet_n, latency_us))
     except socket.timeout:
-        print("Error: Timed out waiting to receive packets")
-        print("So far had received %d packets" % len(rev_packets))
+        logger.error("Error: Timed out waiting to receive packets")
+        logger.info("So far had received %d packets" % len(rev_packets))
 
-    print("Received %d/%d packets back from server" % (len(rev_packets),
-                                                       n_packets))
+    logger.info("Received %d/%d packets back from server" % (len(rev_packets),
+                                                             n_packets))
 
     sock_in.close()
     # Save latency in a csv file
@@ -91,8 +91,8 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
     sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock_out.connect((ip, port))
 
-    print("Sending %d %d-byte packets at about %d B/s to %s:%d..." %
-          (n_packets, payload_len, send_rate, ip, port))
+    logger.info("Sending %d %d-byte packets at about %d B/s to %s:%d..." %
+                (n_packets, payload_len, send_rate, ip, port))
 
     send_start_stmp = time.time()
 
@@ -113,12 +113,12 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
             time.sleep(sleep_time_sec)
 
     send_end_stmp = time.time()
-    print("Finished sending packets!")
+    logger.info("Finished sending packets!")
 
     total_duration = send_end_stmp - send_start_stmp
     n_bytes = n_packets * payload_len
     bytes_per_sec = n_bytes / total_duration
-    print("(Actually sent packets at %.5f kB/s)" % (bytes_per_sec / 1e3))
+    logger.info("(Actually sent packets at %.5f kB/s)" % (bytes_per_sec / 1e3))
     sock_out.close()
 
 
@@ -162,12 +162,12 @@ def run_server(ip, port):
                          (packet_n, recv_addr[0], recv_addr[1]))
             packet_n += 1
             if not data:
-                print('Empty data received, exit...')
+                logger.info('Empty data received, exit...')
                 break
             send_addr = (recv_addr[0], port + 1)
             sock_out.sendto(data, send_addr)
         except KeyboardInterrupt:
-            print('Interrupt detected, exit...')
+            logger.info('Interrupt detected, exit...')
             break
     sock_in.close()
     sock_out.close()
