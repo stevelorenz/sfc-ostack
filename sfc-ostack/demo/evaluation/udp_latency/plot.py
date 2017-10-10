@@ -87,4 +87,4 @@ ax.legend(handles, labels, fontsize=font_size,
           loc='upper left')
 ax.grid()
 
-fig.savefig('./udp_latency_rtt_result.png', dpi=500)
+fig.savefig('./udp_latency_rtt_result.png', dpi=500, bbox_inches='tight')

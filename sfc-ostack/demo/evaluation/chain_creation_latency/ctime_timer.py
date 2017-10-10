@@ -26,8 +26,11 @@ level = {
 logger = logging.getLogger(__name__)
 
 
-def run_server(addr):
-    """Run UDP server"""
+def run_server_al(addr):
+    """Run UDP server with maximal allowed latency mode
+
+    MARK: According to the result, this method seems to be stupid...
+    """
     round_num, pack_num = 0, 0
     # Store chain creation time
     chn_ct_lst = list()
@@ -36,7 +39,8 @@ def run_server(addr):
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)
     recv_sock.bind(addr)
-    recv_sock.settimeout(600)
+    # MARK: the socket is put in blocking mode.
+    recv_sock.settimeout(None)
     logger.debug('Recv socket is ready, bind to %s:%s' % (addr))
     try:
         while round_num < TEST_ROUND:
@@ -61,13 +65,68 @@ def run_server(addr):
                     round_num += 1
                     logger.debug('[CT_Delay] delay: %f, round_num: %d'
                                  % (delay, round_num))
-    except socket.timeout:
-        logger.error('Recv socket timeout!')
-        sys.exit(1)
     except KeyboardInterrupt:
         logger.info('KeyboardInterrupt')
         sys.exit(0)
     else:
+        # Store test result in a csv file
+        with open(OUTPUT_FILE, 'w') as out_file:
+            for delay in chn_ct_lst:
+                out_file.write("%s\n" % delay)
+    finally:
+        recv_sock.close()
+
+
+def run_server_pm(addr):
+    """Run UDP server with payload modification mode
+
+    - The client send packet(payload) with first byte b'a' - old payload
+    - The SFs in the chain modify the first byte to b'b' - new payload
+    """
+    round_num = 0
+    last_old_pload_ts = 0  # time stamp for last old payload
+    # List of SFC creation latency
+    chn_ct_lst = list()
+    chn_created = False
+
+    recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
+                              socket.IPPROTO_UDP)
+    recv_sock.bind(addr)
+    recv_sock.settimeout(None)
+
+    try:
+        while round_num < TEST_ROUND:
+            # For current test round
+            cr_chn_ct = list()
+            pack = recv_sock.recv(BUFFER_SIZE)
+
+            # SFC is not created
+            if pack.startswith(b'a'):
+                logger.debug('Recv a A packet.')
+                chn_created = False
+                # Update time stamp for old payload
+                last_old_pload_ts = time.time()
+
+            if pack.startswith(b'b'):
+                logger.debug('Recv a B packet.')
+                if not chn_created:
+                    logger.debug('SFC is just created')
+                    chn_created = True
+                    # Total SFC creation delay
+                    cr_chn_ct.append(time.time() - last_old_pload_ts)
+                    # Unpack time stamp data in the payload
+                    ts_str = pack.decode('ascii').lstrip('b')
+                    logger.debug('[DEBUG] Time stamp str %s' % ts_str)
+                    ts_lst = ts_str.split(',')
+                    cr_chn_ct.extend(ts_lst)  # total_ct, ts_1sf, ts_2sf,...
+                    chn_ct_lst.append(cr_chn_ct)
+                    round_num += 1
+                logger.debug('SFC is already created.')
+    except KeyboardInterrupt:
+        logger.info('KeyboardInterrupt')
+        sys.exit(0)
+    else:
+        logger.debug('Write test results in file')
         # Store test result in a csv file
         with open(OUTPUT_FILE, 'w') as out_file:
             for delay in chn_ct_lst:
@@ -81,7 +140,7 @@ def run_client(addr):
     """Run UDP Client
 
     MARK: The accuracy of the time.sleep() depends on the underlying OS
-    The OS usually only support millisecond sleeps
+    The OS usually ONLY support millisecond sleeps
     """
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     payload = b'a' * PAYLOAD_LEN
@@ -105,7 +164,9 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-s', '--server', metavar='Address', type=str,
                        help='Run in UDP server mode')
-    parser.add_argument('-d', '--max_delay', type=float,
+    parser.add_argument('-m', '--mode', type=str,
+                        choices=['al', 'pm'], help='Mode for measurements')
+    parser.add_argument('-d', '--max_delay', type=float, default=0.005,
                         help='Maximal allowed packet latency in second')
     parser.add_argument('-r', '--round', type=int, default=5,
                         help='Number of test rounds')
@@ -126,6 +187,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # MARK: Only used for testing...
     if args.log_handler == 'file':
         handler = logging.handlers.RotatingFileHandler(
             './ctime_timer.log', mode='a', maxBytes=5000000, backupCount=5)
@@ -136,31 +198,28 @@ if __name__ == "__main__":
                         handlers=[handler],
                         format=fmt_str)
 
-    # Client
-    SEND_INTERVAL = args.send_interval
-    PAYLOAD_LEN = args.payload_len
-
-    # Server
-    # MARK: This parameter is import, theoretic difference SHOULD be 2 packets
-    #       The minimal ratio SHOULD be 2 here
-    if not args.max_delay:
-        ALLOW_RATIO = 5.0
-        MAX_ALLOWED_DELAY = ALLOW_RATIO * SEND_INTERVAL
-    else:
-        MAX_ALLOWED_DELAY = args.max_delay
-    BUFFER_SIZE = PAYLOAD_LEN
-    TEST_ROUND = args.round
-    OUTPUT_FILE = args.output_file
-
     if args.server:
         ip, port = args.server.split(':')
         addr = (ip, int(port))
-        info_str = 'Test round: %s, Max delay: %s' % (TEST_ROUND,
-                                                      MAX_ALLOWED_DELAY)
-        logger.info('Run UDP server on %s:%s.\n%s' % (ip, port, info_str))
-        run_server(addr)
+        BUFFER_SIZE = args.payload_len
+        TEST_ROUND = args.round
+        OUTPUT_FILE = args.output_file
+        if args.mode == 'al':
+            # MARK: This parameter is import, theoretic difference SHOULD be 2 packets
+            #       The minimal ratio SHOULD be 2 here
+            MAX_ALLOWED_DELAY = args.max_delay
+            info_str = ('Run in maximal allowed latency mode, max-lat: %f'
+                        % MAX_ALLOWED_DELAY)
+            logger.info('Run UDP server on %s:%s. %s' % (ip, port, info_str))
+            run_server_al(addr)
+        if args.mode == 'pm':
+            info_str = ('Run in payload modification mode.')
+            logger.info('Run UDP server on %s:%s. %s' % (ip, port, info_str))
+            run_server_pm(addr)
 
     if args.client:
+        SEND_INTERVAL = args.send_interval
+        PAYLOAD_LEN = args.payload_len
         ip, port = args.client.split(':')
         addr = (ip, int(port))
         info_str = (
