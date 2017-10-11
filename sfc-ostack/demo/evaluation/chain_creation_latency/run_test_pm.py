@@ -100,14 +100,15 @@ def test_ct_pyf():
                 transport = ssh_clt.get_transport()
                 # Try multiple times...
                 # Sometime the forwarding process is not running, i don't know why.
-                for i in range(5):
-                    channel = transport.open_session()
-                    print('[DEBUG] Run python forwarder.')
-                    channel.exec_command(RUN_FWD)
-                    status = channel.recv_exit_status()
-                    # SHOULD be zero
-                    print('[DEBUG] forwarder process status: %d' % status)
-                    time.sleep(3)
+                if not DEBUG_MODE:
+                    for i in range(5):
+                        channel = transport.open_session()
+                        print('[DEBUG] Run python forwarder.')
+                        channel.exec_command(RUN_FWD)
+                        status = channel.recv_exit_status()
+                        # SHOULD be zero
+                        print('[DEBUG] forwarder process status: %d' % status)
+                        time.sleep(3)
                 sftp_clt.close()
                 ssh_clt.close()
 
@@ -131,7 +132,11 @@ if __name__ == "__main__":
     ap.add_argument('dst_addr', metavar='IP:PORT',
                     help='Fixed IP and port of the dst instance')
     ap.add_argument('dst_fip', help='Floating IP of the dst instance')
+
     ap.add_argument('--clean', help='Clear created SFC resouces, used for tests',
+                    action='store_true')
+    ap.add_argument('--full_clean',
+                    help='Also kill ctime_timer process on dst instance',
                     action='store_true')
     ap.add_argument('--debug', help='Run in debug mode...',
                     action='store_true')
@@ -156,12 +161,29 @@ if __name__ == "__main__":
     MAX_SF_NUM = args.max_sf
     DST_ADDR = args.dst_addr
     DST_FIP = args.dst_fip
+    TEST_ROUND = args.round
+
     SSH_USER = 'ubuntu'
     SFC_CONF = './sfc_conf.yaml'
     SSH_PKEY = '/home/zuo/sfc_ostack_test/sfc_test.pem'
     INIT_SCRIPT = './init_py_forwarding.sh'
 
-    if args.clean:
+    # Command to run and kill ctime_timer.py
+    RUN_CTIMER = ''
+    RUN_CTIMER += 'nohup python3 /home/ubuntu/ctime_timer.py '
+    RUN_CTIMER += '-s %s ' % (DST_ADDR)
+    RUN_CTIMER += '-m pm '
+    RUN_CTIMER += '-r %s ' % TEST_ROUND
+    KILL_CTIMER = "pkill -f 'python3 /home/ubuntu/ctime_timer.py'"
+
+    # Command to run python forwarder
+    RUN_FWD = ''
+    RUN_FWD += 'nohup python3 /home/ubuntu/forwarder.py '
+    RUN_FWD += '%s ' % DST_ADDR
+    RUN_FWD += '> /dev/null 2>&1 &'
+    print('[DEBUG] Cmd to run forwarder: %s' % RUN_FWD)
+
+    if args.clean or args.full_clean:
         print('[INFO] Run simple clean func')
         for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
             try:
@@ -171,26 +193,33 @@ if __name__ == "__main__":
                     check=True)
             except Exception:
                 pass
-        sys.exit(0)
+            if args.full_clean:
+                ssh_clt = paramiko.SSHClient()
+                ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                while True:
+                    try:
+                        ssh_clt.connect(DST_FIP, 22, SSH_USER,
+                                        key_filename=SSH_PKEY)
+                    except Exception:
+                        print(
+                            '[Error] Can not connect instance, try again after 3 seconds'
+                        )
+                        time.sleep(3)
+                    else:
+                        print('[DEBUG] Connect to instance succeeded.')
+                        break
+                transport = ssh_clt.get_transport()
+                for i in range(5):
+                    channel = transport.open_session()
+                    print('[DEBUG] Kill ctime_timer on recv instance.')
+                    channel.exec_command(KILL_CTIMER)
+                    status = channel.recv_exit_status()
+                    print('[DEBUG] ctime_timer process status: %d' % status)
+                ssh_clt.close()
+            sys.exit(0)
 
     DEBUG_MODE = args.debug
 
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
-    TEST_ROUND = args.round
-
-    # Command to run and kill ctime_timer.py
-    RUN_CTIMER = ''
-    RUN_CTIMER += 'nohup python3 /home/ubuntu/ctime_timer.py '
-    RUN_CTIMER += '-s %s ' % (DST_ADDR)
-    RUN_CTIMER += '-m pm '
-    RUN_CTIMER += '-r %s ' % TEST_ROUND
-    KILL_CTIMER = "pkill -f 'nohup python3 /home/ubuntu/ctime_timer.py'"
-
-    # Command to run python forwarder
-    RUN_FWD = ''
-    RUN_FWD += 'nohup python3 /home/ubuntu/forwarder.py '
-    RUN_FWD += '%s ' % DST_ADDR
-    RUN_FWD += '> /dev/null 2>&1 &'
-    print('[DEBUG] Cmd to run forwarder: %s' % RUN_FWD)
 
     test_ct_pyf()

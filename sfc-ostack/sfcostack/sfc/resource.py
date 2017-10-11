@@ -232,7 +232,7 @@ class ServerChain(object):
         :param wait_complete: Block until the stack has the status complete
         """
         hot_str = self.get_output_hot()
-        self.logger.info('Create server chain using HEAT, stack name: %s' %
+        self.logger.info('Create the server chain using HEAT, stack name: %s' %
                          self.name)
         self.heat_client.stacks.create(stack_name=self.name,
                                        template=hot_str)
@@ -252,7 +252,7 @@ class ServerChain(object):
                     'Creation of server chain:%s timeout!' % self.name)
 
     def delete(self, wait_complete=True, interval=3, timeout=600):
-        self.logger.info('Delete server chain using HEAT, stacks name: %s' %
+        self.logger.info('Delete the server chain using HEAT, stacks name: %s' %
                          self.name)
         sc_stack = self.conn.orchestration.find_stack(self.name)
         if not sc_stack:
@@ -319,7 +319,28 @@ class PortChain(object):
 
     Handles flow classifier, port pair, port pair group and port chain.
 
+    Resource Dependency:
+
+        Port Pair: neutron ingress and egress ports
+        Port Pair Group: port pairs
+        Port Chain: port pairs, port pair groups and flow classifier
+
+    CRUD Operation:
+
+        - Creation:
+            In order to reduce the latency of packets(the time difference between
+            last SFC-modified packet and the first SFC-modified packet), the flow
+            classifier is created after finishing creation of all port pairs and
+            port pair groups. The port chain is created finally, which depends on
+            flow classifier.
+
+        - Deletion:
+            Similar to the creation, the flow classifier will be deleted after
+            finishing deleting the port chain.
+
+
     Naming Pattern:
+
         Port Pair: pp_(port pair group index)_(port pair index) e.g. pp_1_1
         Port Pair Group: pp_grp_(port pair group index) e.g. pp_grp_1
         Port Chain: Get name from user config
@@ -346,22 +367,7 @@ class PortChain(object):
 
     def create(self):
         """Create port chain"""
-
-        self.logger.info('Create flow classifier.')
-        # Get logical src and dest port id
-        src_pt = self.conn.network.find_port(
-            self.flow_conf['logical_source_port']
-        )
-        dst_pt = self.conn.network.find_port(
-            self.flow_conf['logical_destination_port']
-        )
-        self.flow_conf['logical_source_port'] = src_pt.id
-        self.flow_conf['logical_destination_port'] = dst_pt.id
-        self.pc_client.create('flow_classifier', self.flow_conf)
-        fc_id = self.pc_client.get_id(
-            'flow_classifier', self.flow_conf['name'])
-
-        self.logger.info('Create port chain.')
+        self.logger.info('Create port pairs and port pair groups.')
         srv_ppgrp_lst = self.srv_chain.get_srv_ppgrp_id()
         pp_grp_id_lst = list()
         for grp_idx, pp_grp in enumerate(srv_ppgrp_lst):
@@ -386,22 +392,40 @@ class PortChain(object):
                                               pp_grp_args['name'])
             pp_grp_id_lst.append(pp_grp_id)
 
+        # Get logical src and dest port id
+        src_pt = self.conn.network.find_port(
+            self.flow_conf['logical_source_port']
+        )
+        dst_pt = self.conn.network.find_port(
+            self.flow_conf['logical_destination_port']
+        )
+        self.flow_conf['logical_source_port'] = src_pt.id
+        self.flow_conf['logical_destination_port'] = dst_pt.id
+        self.logger.info('Create the flow classifier.')
+        self.pc_client.create('flow_classifier', self.flow_conf)
+        fc_id = self.pc_client.get_id(
+            'flow_classifier', self.flow_conf['name'])
+
         pc_args = {
             'name': self.name,
             'description': self.desc,
             'port_pair_groups': pp_grp_id_lst,
             'flow_classifiers': [fc_id]
         }
+        self.logger.info('Create the port chain: %s.' % self.name)
         self.pc_client.create('port_chain', pc_args)
 
     def delete(self):
         """Delete the port chain"""
-
-        self.logger.info('Delete port chain.')
+        self.logger.info('Delete the port chain: %s' % self.name)
         # Delete port chain
         self.pc_client.delete('port_chain', self.name)
 
+        self.logger.info('Delete the flow classifier.')
+        self.pc_client.delete('flow_classifier', self.flow_conf['name'])
+
         # Delete all port pair groups
+        self.logger.info('Delete port pair groups and port pairs.')
         srv_ppgrp_lst = self.srv_chain.get_srv_ppgrp_id()
         for grp_idx in range(len(srv_ppgrp_lst)):
             pp_grp_name = 'pp_grp_%s' % grp_idx
@@ -412,9 +436,6 @@ class PortChain(object):
             for pp_idx in range(len(pp_grp)):
                 pp_name = 'pp_%s_%s' % (grp_idx, pp_idx)
                 self.pc_client.delete('port_pair', pp_name)
-
-        self.logger.info('Delete flow classifier.')
-        self.pc_client.delete('flow_classifier', self.flow_conf['name'])
 
 
 # TODO: Add Mininet net liked SFC resource object

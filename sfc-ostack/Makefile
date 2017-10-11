@@ -43,6 +43,10 @@ stat-src:
 	@echo "- Line numbers: "
 	@wc -l $(BASHSRC)
 
+gen-clog:
+	@echo "# Generate change log with gitchangelog"
+	@gitchangelog > CHANGELOG.md
+
 clean-tmp:
 	@echo "Run cleanups..."
 	echo $(TMP)

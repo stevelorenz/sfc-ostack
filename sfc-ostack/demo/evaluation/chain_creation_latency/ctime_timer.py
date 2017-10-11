@@ -25,12 +25,17 @@ level = {
 }
 logger = logging.getLogger(__name__)
 
+# Minus len for send time stamp
+MAX_ALLOWED_UDP_PAYLOAD = (512 - 18)
+RECV_BUFFER_SIZE = 512
+
 
 def run_server_al(addr):
     """Run UDP server with maximal allowed latency mode
 
     MARK: According to the result, this method seems to be stupid...
     """
+    logger.warn('According to result, this method is not stable...')
     round_num, pack_num = 0, 0
     # Store chain creation time
     chn_ct_lst = list()
@@ -44,7 +49,7 @@ def run_server_al(addr):
     logger.debug('Recv socket is ready, bind to %s:%s' % (addr))
     try:
         while round_num < TEST_ROUND:
-            pack = recv_sock.recv(BUFFER_SIZE)
+            pack = recv_sock.recv(RECV_BUFFER_SIZE)
             now_ts = time.time()
             pack_num += 1
             if len(recv_ts_que) == 0:
@@ -98,30 +103,41 @@ def run_server_pm(addr):
         while round_num < TEST_ROUND:
             # For current test round
             cr_chn_ct = list()
-            pack = recv_sock.recv(BUFFER_SIZE)
+            pack = recv_sock.recv(RECV_BUFFER_SIZE)
 
             # SFC is not created
             if pack.startswith(b'a'):
-                logger.debug('Recv a A packet.')
                 chn_created = False
                 # Update time stamp for old payload
                 last_old_pload_ts = time.time()
+                logger.debug('Recv a A packet. last ts: %s' %
+                             last_old_pload_ts)
 
             if pack.startswith(b'b'):
-                logger.debug('Recv a B packet.')
+                recv_bpack_ts = time.time()
+                logger.debug('Recv a B packet. ts: %s' % recv_bpack_ts)
                 if not chn_created:
                     logger.debug('SFC is just created')
                     chn_created = True
                     # Total SFC creation delay
-                    cr_chn_ct.append(time.time() - last_old_pload_ts)
                     # Unpack time stamp data in the payload
-                    ts_str = pack.decode('ascii').lstrip('b')
-                    logger.debug('[DEBUG] Time stamp str %s' % ts_str)
+                    ts_str = pack.decode('ascii')
+                    logger.debug('Time stamp str before strip: %s' % ts_str)
+                    ts_str = ts_str.lstrip('b')
+                    logger.debug('Time stamp str after strip: %s' % ts_str)
+                    # A list of time stamps
+                    # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
                     ts_lst = ts_str.split(',')
-                    cr_chn_ct.extend(ts_lst)  # total_ct, ts_1sf, ts_2sf,...
+                    ts_lst.append(recv_bpack_ts)
+                    cr_chn_ct.extend(ts_lst)
+                    cr_chn_ct.append(last_old_pload_ts)
+                    cr_chn_ct_str = ','.join(map(str, cr_chn_ct))
+                    logger.debug('Current ct str %s' % cr_chn_ct_str)
                     chn_ct_lst.append(cr_chn_ct)
                     round_num += 1
-                logger.debug('SFC is already created.')
+                else:
+                    logger.debug('SFC is already created.')
+                    logger.debug('Payload: %s' % pack.decode('ascii'))
     except KeyboardInterrupt:
         logger.info('KeyboardInterrupt')
         sys.exit(0)
@@ -143,9 +159,13 @@ def run_client(addr):
     The OS usually ONLY support millisecond sleeps
     """
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    payload = b'a' * PAYLOAD_LEN
+    base_payload = b'a' * PAYLOAD_LEN
     try:
         while True:
+            # Send time stamp
+            send_ts_b = str(time.time()).encode('ascii')
+            payload = b','.join((base_payload, send_ts_b))
+            logger.debug('Send payload: %s' % payload.decode('ascii'))
             send_sock.sendto(payload, addr)
             time.sleep(SEND_INTERVAL)
     except KeyboardInterrupt:
@@ -177,7 +197,7 @@ if __name__ == "__main__":
                        help='Run in UDP client mode')
     parser.add_argument('--send_interval', type=float, default=0.001,
                         help='Client send interval in second')
-    parser.add_argument('--payload_len', type=int, default=512,
+    parser.add_argument('--payload_len', type=int, default=1,
                         help='Client payload length')
 
     parser.add_argument('-l', '--log_level', type=str, help='Logging level',
@@ -201,7 +221,6 @@ if __name__ == "__main__":
     if args.server:
         ip, port = args.server.split(':')
         addr = (ip, int(port))
-        BUFFER_SIZE = args.payload_len
         TEST_ROUND = args.round
         OUTPUT_FILE = args.output_file
         if args.mode == 'al':
@@ -220,6 +239,10 @@ if __name__ == "__main__":
     if args.client:
         SEND_INTERVAL = args.send_interval
         PAYLOAD_LEN = args.payload_len
+        if PAYLOAD_LEN > MAX_ALLOWED_UDP_PAYLOAD:
+            logger.error('Maximal allowed UDP payload length is %d' %
+                         MAX_ALLOWED_UDP_PAYLOAD)
+            sys.exit(1)
         ip, port = args.client.split(':')
         addr = (ip, int(port))
         info_str = (

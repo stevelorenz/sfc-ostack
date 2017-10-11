@@ -1,4 +1,12 @@
 # TODO List #
 
-- Add SFC resource and examples
-- Add docs for init_scripts and configuration files
+### Impros and Fixes ###
+
+- Add docs and READMEs
+- Fix issues in CLI module
+- Add a wrapper for SFC resource
+
+### To be implemented ###
+
+- Add cloud node resource monitor
+- Add SFC resource monitor
