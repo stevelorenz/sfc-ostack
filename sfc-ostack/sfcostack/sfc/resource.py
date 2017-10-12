@@ -5,6 +5,10 @@
 """
 About: SFC Resource
 
+MARK(Zuo, 12.10.2017):
+    Currently all CRUD operations are implemented in the resource classes, which
+    is simple but not architecturally bas. This SHOULD be separated.
+
 Email: xianglinks@gmail.com
 """
 
@@ -18,12 +22,13 @@ from keystoneauth1 import loading, session
 from openstack import connection
 
 from sfcostack import hot, utils
+# MARK: CAN be replaced with openstack-neutronclient with v2 API
 from sfcostack.sfc import netsfc_clt
+
 
 ############
 #  Errors  #
 ############
-
 
 class SFCRscError(Exception):
     """Base error of SFC resource"""
@@ -35,8 +40,8 @@ class ServerChainError(SFCRscError):
     pass
 
 
+@utils.deprecated
 class ConfigInstanceError(SFCRscError):
-
     """Error while configuring instances via SSH"""
     pass
 
@@ -50,11 +55,22 @@ class PortChainError(SFCRscError):
 #  SFC Resources  #
 ###################
 
+"""
+MARK(Zuo, 12-10.2017):
+
+The reason of separation of ServerChain and PortChain is trying to reduce the
+overhead for in future implemented dynamic chain topology updating. The creation
+of the ServerChain takes much time, which SHOULD be avoided if the SFs on the
+server remain unchanged.
+"""
+
+
 class ServerChain(object):
+    """Server Chain, a chain of server groups.
 
-    """Server Chain
-
-    A chain of server groups
+    Each server group SHOULD contains a list of server instances with the same
+    type of SFs, which matches the definition of a port pair group(mainly used
+    for traffic balancing).
     """
 
     def __init__(self, auth_args, name, desc,
@@ -62,10 +78,10 @@ class ServerChain(object):
                  fip_port=None):
         """Init server chain object
 
-        :param auth_args:
-        :param name: Name of the server chain
-        :param desc: Description
-        :param net_conf: Network configs
+        :param auth_args (dict):
+        :param name (str): Name of the server chain
+        :param desc (str): Description of the server chain, optional
+        :param net_conf (dict): Network configs
         :param srv_grp_lst (list): A list of server groups
         :param sep_access_port (Bool): If True, a separate port is created for
                                        remote access
@@ -106,6 +122,26 @@ class ServerChain(object):
             'net': net.id,
             'subnet': subnet.id
         }
+
+    def _get_ins_fips(self):
+        """Get a list of floating IPs of all server instances
+
+        :retype: list
+        """
+        fip_lst = list()
+        for srv_grp in self.srv_grp_lst:
+            grp_fip_lst = list()
+            for srv in srv_grp:
+                fip_pt_name = srv['name'] + '_%s' % self.fip_port
+                fip = list(
+                    self.conn.network.ips(port_id=fip_pt_name.id))[0].floating_ip_address
+                grp_fip_lst.append(fip)
+            fip_lst.append(grp_fip_lst)
+        return fip_lst
+
+    def _get_ssh_clients(self):
+        """TODO: Get a list of SSH clients for server instances"""
+        pass
 
     # MARK: current not used
     @utils.deprecated
@@ -229,7 +265,7 @@ class ServerChain(object):
     def create(self, wait_complete=True, interval=3, timeout=600):
         """Create server chain using HEAT
 
-        :param wait_complete: Block until the stack has the status complete
+        :param wait_complete (Bool): Block until the stack has the status complete
         """
         hot_str = self.get_output_hot()
         self.logger.info('Create the server chain using HEAT, stack name: %s' %
@@ -282,6 +318,8 @@ class ServerChain(object):
 
         Format:
             [ [ (ingress_port, egress_port) ], [...] ]
+
+        :retype: list
         """
         pp_grp_name_lst = list()
         for srv_grp in self.srv_grp_lst:
@@ -299,6 +337,8 @@ class ServerChain(object):
 
         Format:
             [ [ (ingress_port_id, egress_port_id) ], [...] ]
+
+        :retype: list
         """
         pp_grp_id_lst = list()
         for srv_grp in self.srv_grp_lst:
@@ -312,9 +352,67 @@ class ServerChain(object):
             pp_grp_id_lst.append(pp_grp_id)
         return pp_grp_id_lst
 
+    # --- Service Function related Methods ----
+    # Used to check if the SF runs properly on the server instances
+
+    def wait_proc(self, proc_pattern, max_retry=3):
+        """Wait until a specific process is running on all server instances
+
+        Use SSH and pgrep to check the proc_pattern, default option: -f, MAY be
+        replaced with a better method
+
+        :param proc_pattern (str): Pattern for pgrep checking
+        """
+        check_cmd = "pgrep -f '%s'" % proc_pattern
+        fip_lst = self._get_ins_fips()
+        ssh_clt = paramiko.SSHClient()
+        ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        for srv_grp, fip_grp in zip(self.srv_grp_lst, fip_lst):
+            for srv, fip in zip(srv_grp, fip_grp):
+                retry = 0
+                while retry <= max_retry:
+                    try:
+                        ssh_clt.connect(fip, 22, srv['ssh']['user_name'],
+                                        key_filename=srv['ssh']['pvt_key_file'])
+                    except Exception:
+                        self.logger.warn(
+                            '[FIP:%s] Can not connect to instance, try again after 3 seconds'
+                            % fip
+                        )
+                        time.sleep(3)
+                        retry += 1
+                    else:
+                        break
+                else:
+                    ssh_clt.close()
+                    raise ServerChainError(
+                        '[FIP:%s] Can not connect to instance via SSH' % fip)
+
+                trans = ssh_clt.get_transport()
+                retry = 0
+                while retry <= max_retry:
+                    channel = trans.open_session()
+                    channel.exec_command(check_cmd)
+                    status = channel.recv_exit_status()
+                    if status == 0:
+                        break
+                    else:
+                        self.logger.warn(
+                            '[FIP:%s] Process is not running, recheck after 10 seconds.'
+                            % fip
+                        )
+                        time.sleep(10)
+                        retry += 1
+                else:
+                    ssh_clt.close()
+                    raise ServerChainError(
+                        '[FIP:%s] SF Process is not running' % fip)
+
+                ssh_clt.close()
+
 
 class PortChain(object):
-
     """Port Chain
 
     Handles flow classifier, port pair, port pair group and port chain.
@@ -439,6 +537,7 @@ class PortChain(object):
 
 
 # TODO: Add Mininet net liked SFC resource object
+# MARK: Dynamic management of the SFC SHOULD implemented in ./manager.py
 class SFC(object):
     pass
 

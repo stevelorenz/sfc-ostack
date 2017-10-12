@@ -7,7 +7,8 @@ PIP_REQUIREMENTS = './requirements.txt'
 PIP_REQUIREMENTS_DEV = './dev_requirements.txt'
 
 PYTMP = $(shell find ./ -path './venv' -prune -o -name '*.pyc' -o -name '__pycache__' -print)
-TMP = $(PYTMP) './sfc_ostack.egg-info' './dist'
+BUILT = './build' './dist' './sfc_ostack.egg.info'
+TMP = $(PYTMP) $(BUILT)
 
 PYSRC = $(shell find ./ -path './venv' -prune -o -name '*.py' -print)
 BASHSRC= $(shell find ./ -path './venv' -prune -o -name '*.sh' -print)
@@ -25,10 +26,12 @@ all:
 	@echo "Makefile needs your attention"
 
 lint-src:
-	@echo "Lint all python src with flake8..."
+	@echo "[Lint] Lint all python src with flake8..."
 	@flake8 --exclude ./venv --ignore=E501,F401,E402,F841 \
 		--show-source --statistics --max-complexity=15 --exit-zero \
 		$(PYSRC)
+	@echo "[Lint] Lint all bash src with shellcheck..."
+	@shellcheck $(BASHSRC)
 
 format-src:
 	@echo "Format all python src with autopep8..."
@@ -48,21 +51,20 @@ gen-clog:
 	@gitchangelog > CHANGELOG.md
 
 clean-tmp:
-	@echo "Run cleanups..."
-	echo $(TMP)
+	@echo "Run generall cleanups..."
 	@rm -rf $(TMP)
 
 sync-bitbucket-local:
 	@echo "Sync codes to local bitbucket repo..."
-	rsync -rav --exclude="venv" --progress --delete $(LOCAL_GH) $(LOCAL_HOST):$(LOCAL_BB)
+	@rsync -rav --exclude="venv" --progress --delete $(LOCAL_GH) $(LOCAL_HOST):$(LOCAL_BB)
 
 sync-github-local:
 	@echo "Sync codes to local github repo..."
-	rsync -rav --exclude="venv" --delete $(LOCAL_BB) $(LOCAL_HOST):$(LOCAL_GH)
+	@rsync -rav --exclude="venv" --delete $(LOCAL_BB) $(LOCAL_HOST):$(LOCAL_GH)
 
 upload-test-server:
-	@echo "Upload to the test server: $(TEST_SERVER)"
-	rsync -rav -e ssh --exclude="venv" --progress --delete $(LOCAL_GH) $(TEST_SERVER):$(REMOTE_LOC)
+	@echo "Upload to the remote test server: $(TEST_SERVER)"
+	@rsync -rav -e ssh --exclude="venv" --progress --delete $(LOCAL_GH) $(TEST_SERVER):$(REMOTE_LOC)
 
 save_pkgs:
 	@echo "Save installed pip packages in $(PIP_REQUIREMENTS)"

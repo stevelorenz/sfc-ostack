@@ -27,6 +27,9 @@ if __name__ == "__main__":
                     choices=['create', 'delete'])
     ap.add_argument('sf_num', help='Number of SF instances', type=int)
 
+    ap.add_argument('---sf_wait_time', type=float, default=10.0,
+                    help='Time waiting for SFs to be ready.')
+
     if len(sys.argv) == 1:
         ap.print_help()
         sys.exit()
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         'ssh': {
             'user_name': 'ubuntu',
             'pub_key_name': 'sfc_test',
-            'pvt_key_file': './sfc_test.pem'
+            'pvt_key_file': '/home/zuo/sfc_ostack_test/sfc_test.pem'
         }
     }
 
@@ -63,6 +66,17 @@ if __name__ == "__main__":
                                          fc_conf['description'],
                                          net_conf, srv_queue, True, 'pt')
         srv_chain.create(timeout=3600)
+
+        """
+        MARK: This is only a work around for tests. Just wait for all SF
+        programs running properly.
+        Checking status of the SF SHOULD be implmented in the resource or
+        manager module.
+        """
+        wait_time = args.sf_wait_time * sf_num
+        print('[TEST] Waiting %f seconds for SFs to be ready.' % wait_time)
+        time.sleep((args.sf_wait_time * sf_num))
+
         port_chain = resource.PortChain(auth_args, fc_conf['name'],
                                         fc_conf['description'],
                                         srv_chain, flow_conf)

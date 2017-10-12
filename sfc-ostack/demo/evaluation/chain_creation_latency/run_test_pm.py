@@ -75,44 +75,8 @@ def test_ct_pyf():
                 ['python3', '../sfc_mgr.py', SFC_CONF,
                     INIT_SCRIPT, 'create', '%d' % srv_num],
                 check=True)
-            time.sleep(10)
-            ssh_clt = paramiko.SSHClient()
-            # Allow connection not in the known_host
-            ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            for ins_num in range(1, srv_num + 1):
-                print('[TEST] Copy and run SF program on server: chn%d' % ins_num)
-                pt_name = 'chn%d_pt' % ins_num
-                fip = _get_floating_ip(pt_name)
-                while True:
-                    try:
-                        ssh_clt.connect(fip, 22, SSH_USER,
-                                        key_filename=SSH_PKEY)
-                    except Exception:
-                        print(
-                            '[Error] Can not connect %s, Try again after 3 seconds...' % fip)
-                        time.sleep(3)
-                    else:
-                        print('[DEBUG] Connect to %s succeeded' % fip)
-                        break
-                sftp_clt = ssh_clt.open_sftp()
-                sftp_clt.put('./forwarder.py',
-                             '/home/ubuntu/forwarder.py')
-                transport = ssh_clt.get_transport()
-                # Try multiple times...
-                # Sometime the forwarding process is not running, i don't know why.
-                if not DEBUG_MODE:
-                    for i in range(5):
-                        channel = transport.open_session()
-                        print('[DEBUG] Run python forwarder.')
-                        channel.exec_command(RUN_FWD)
-                        status = channel.recv_exit_status()
-                        # SHOULD be zero
-                        print('[DEBUG] forwarder process status: %d' % status)
-                        time.sleep(3)
-                sftp_clt.close()
-                ssh_clt.close()
 
-            time.sleep(15)  # recv some B packets
+            time.sleep(20)  # recv some B packets
 
             if not DEBUG_MODE:
                 print('[DEBUG] Delete %d SFs' % srv_num)

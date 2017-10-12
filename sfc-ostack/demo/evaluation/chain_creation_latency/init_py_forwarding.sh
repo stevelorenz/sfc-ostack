@@ -47,3 +47,10 @@ ovs-ofctl add-flow br0 "in_port=1 actions=mod_dl_dst:$BRIDGE_MAC,mod_nw_src:$FAK
 # Route packets from LOCAL port to egress port
 ip route add $DST_IP dev br0
 ovs-ofctl add-flow br0 "in_port=local actions=mod_nw_src:$SRC_IP,mod_nw_dst:$DST_IP,output:2"
+
+##########################
+#  Run Python Forwarder  #
+##########################
+
+curl 192.168.100.1:8888/forwarder.py -o /home/ubuntu/forwarder.py
+python3 /home/ubuntu/forwarder.py "$DST_IP:9999" > /dev/null 2>&1 &
