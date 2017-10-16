@@ -3,8 +3,9 @@
 # vim:fenc=utf-8
 
 """
-About: Run SFC creation time measurements
-       * Based on payload modification(pm)
+About: SFC start time measurements
+
+       Use payload modification(pm) mode of ./st_timer.py
 
        - Before SFC creation: start with b'a'
        - After SFC creation: start with b'b'
@@ -16,10 +17,13 @@ import argparse
 import os
 import subprocess
 import sys
+sys.path.insert(0, '../')
 import time
 
 import paramiko
 from openstack import connection
+
+from sfc_mgr import EvaSFCMgr
 
 
 def _get_floating_ip(pt_name):
@@ -28,18 +32,18 @@ def _get_floating_ip(pt_name):
     return fip
 
 
-def test_ct_pyf():
-    """Test chain creation time with python forwarding
+def test_sfc_ct(mode=0):
+    """Test chain start time
 
     MARK: SHOULD be split into small funcs...
     """
-    print('[TEST] Test SFC creation time with python forwarding.')
+    print('[TEST] Test SFC start time with python forwarding.')
 
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
         if not DEBUG_MODE:
-            outfile_name = 'cen-pyf-%d-cctime-pm.csv' % srv_num
+            ts_out_file = 'sfts-s%d-m%d.csv' % (srv_num, mode)
             CRT_RUN_CTIMER = RUN_CTIMER
-            CRT_RUN_CTIMER += '-o %s ' % outfile_name
+            CRT_RUN_CTIMER += '-o %s ' % ts_out_file
             CRT_RUN_CTIMER += '> /dev/null 2>&1 &'
             print('[DEBUG] Cmd for running CTimer: %s' % CRT_RUN_CTIMER)
             # Run timer on the dst instance
@@ -68,36 +72,66 @@ def test_ct_pyf():
             ssh_clt.close()
 
         print('[DEBUG] Start creating and deleting SFC')
-        for round_num in range(1, TEST_ROUND + 1):
-            time.sleep(15)  # recv some A packets
-            print('[DEBUG] Create %d SFs' % srv_num)
-            subprocess.run(
-                ['python3', '../sfc_mgr.py', SFC_CONF,
-                    INIT_SCRIPT, 'create', '%d' % srv_num],
-                check=True)
+        eva_sfc_mgr = EvaSFCMgr(SFC_CONF, INIT_SCRIPT)
 
-            time.sleep(20)  # recv some B packets
-
-            if not DEBUG_MODE:
-                print('[DEBUG] Delete %d SFs' % srv_num)
-                subprocess.run(
-                    ['python3', '../sfc_mgr.py', SFC_CONF,
-                        INIT_SCRIPT, 'delete', '%d' % srv_num],
-                    check=True)
+        if mode == 0:
+            print('[TEST] Run tests in mode 0.')
+            # Chain start time stamp
+            start_ts_file = 'ccts-s%d.csv' % srv_num
+            ccts_lst = list()
+            for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
+                print('[DEBUG] Test round: %d' % round_num)
+                time.sleep(10)  # recv some A packets
+                # Start ts of SFC start
+                ccts_lst.append(time.time())
+                srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=None)
+                port_chain = eva_sfc_mgr.create_pc(srv_chain)
+                time.sleep(10)  # recv some B packets
+                eva_sfc_mgr.delete_pc(port_chain)
+                eva_sfc_mgr.delete_sc(srv_chain)
                 time.sleep(3)
+
+        with open(start_ts_file, 'w+') as csv_f:
+            for ts in ccts_lst:
+                csv_f.write('%f\n' % ts)
+
+        # MARK: Do not re-create the ServerChain, only re-create PortChain
+        if mode == 1:
+            print('[TEST] Run tests in mode 1.')
+            srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=15)
+            for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
+                print('[DEBUG] Test round: %d' % round_num)
+                time.sleep(10)  # recv some A packets
+                # Create the port chain
+                port_chain = eva_sfc_mgr.create_pc(srv_chain)
+                time.sleep(10)  # recv some B packets
+                # Delete the port chain
+                eva_sfc_mgr.delete_pc(port_chain)
+                time.sleep(3)
+            time.sleep(3)
+
+            eva_sfc_mgr.delete_sc(srv_chain)
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description='Run SFC creation time test.')
+    ap = argparse.ArgumentParser(description='Run SFC start time test.')
     ap.add_argument('min_sf', type=int, help='Minimal number of SF server')
     ap.add_argument('max_sf', type=int, help='Maximal number of SF server')
     ap.add_argument('-r', '--round', type=int, default=1,
                     help='Number of rounds for testing')
+    ap.add_argument('--add_round', type=int, default=1,
+                    help='Additional round for testing')
+    ap.add_argument('-m', '--mode', type=int, choices=[0, 1], default=0,
+                    help=('Measure mode.'
+                          '0: Without checking for SF status.'
+                          '1: With checking for SF status, smaller Gap-time')
+                    )
+
     ap.add_argument('dst_addr', metavar='IP:PORT',
                     help='Fixed IP and port of the dst instance')
     ap.add_argument('dst_fip', help='Floating IP of the dst instance')
 
-    ap.add_argument('--clean', help='Clear created SFC resouces, used for tests',
+    ap.add_argument('--clean', help='Clear created SFC resources, used for tests',
                     action='store_true')
     ap.add_argument('--full_clean',
                     help='Also kill ctime_timer process on dst instance',
@@ -126,6 +160,7 @@ if __name__ == "__main__":
     DST_ADDR = args.dst_addr
     DST_FIP = args.dst_fip
     TEST_ROUND = args.round
+    ADD_ROUND = args.add_round
 
     SSH_USER = 'ubuntu'
     SFC_CONF = './sfc_conf.yaml'
@@ -147,6 +182,7 @@ if __name__ == "__main__":
     RUN_FWD += '> /dev/null 2>&1 &'
     print('[DEBUG] Cmd to run forwarder: %s' % RUN_FWD)
 
+    # Try to cleanup all old resouces
     if args.clean or args.full_clean:
         print('[INFO] Run simple clean func')
         for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
@@ -158,6 +194,7 @@ if __name__ == "__main__":
             except Exception:
                 pass
             if args.full_clean:
+                print('[INFO] Run full clean func')
                 ssh_clt = paramiko.SSHClient()
                 ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 while True:
@@ -186,4 +223,4 @@ if __name__ == "__main__":
 
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
 
-    test_ct_pyf()
+    test_sfc_ct(args.mode)

@@ -66,6 +66,12 @@ def recv():
         )
 
 
+def resp_mgn():
+    """TODO: Open a socket for responsing the manage messages from central
+    controller"""
+    pass
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Python UDP forwarder',

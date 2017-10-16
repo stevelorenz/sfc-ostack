@@ -22,6 +22,7 @@ from keystoneauth1 import loading, session
 from openstack import connection
 
 from sfcostack import hot, utils
+from sfcostack.log import logger
 # MARK: CAN be replaced with openstack-neutronclient with v2 API
 from sfcostack.sfc import netsfc_clt
 
@@ -37,12 +38,6 @@ class SFCRscError(Exception):
 
 class ServerChainError(SFCRscError):
     """ServerChain Error"""
-    pass
-
-
-@utils.deprecated
-class ConfigInstanceError(SFCRscError):
-    """Error while configuring instances via SSH"""
     pass
 
 
@@ -66,6 +61,7 @@ server remain unchanged.
 
 
 class ServerChain(object):
+
     """Server Chain, a chain of server groups.
 
     Each server group SHOULD contains a list of server instances with the same
@@ -90,7 +86,6 @@ class ServerChain(object):
                                pt_in: ingress port
                                pt_out: egress port
         """
-        self.logger = logging.getLogger(__name__)
 
         self.name = name
         self.desc = desc
@@ -142,49 +137,6 @@ class ServerChain(object):
     def _get_ssh_clients(self):
         """TODO: Get a list of SSH clients for server instances"""
         pass
-
-    # MARK: current not used
-    @utils.deprecated
-    def _config_server(self, srv, ip, port=22, interval=3, timeout=120):
-        """Run configs on a FC server via SSH
-
-        :param srv (dict): Dict of server parameters.
-        :param ip (str): IP for SSH
-        :param interval (float): Interval for checking SSH connection
-        :param timeout (float): Timeout for connection error
-        """
-        subnet = self.conn.network.find_subnet(self.net_conf['subnet_name'])
-        ssh_clt = paramiko.SSHClient()
-        # Allow connection not in the known_host
-        ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        succ, total_time = 0, 0
-        while not succ:
-            try:
-                succ = 1
-                ssh_clt.connect(ip, port, self.ssh_conf['user_name'],
-                                key_filename=self.ssh_conf['pvt_key_file'])
-            except paramiko.ssh_exception.NoValidConnectionsError as error:
-                succ = 0
-                time.sleep(interval)
-                total_time += interval
-                if total_time > timeout:
-                    raise ConfigInstanceError(
-                        'Can not create SSH connection.' + str(error))
-
-        self.logger.info('Config server:%s with IP:%s via SSH.'
-                         % (srv['name'], ip))
-        for ifce in srv['ifce']:
-            for cmd in (
-                'sudo ip link set %s up' % ifce,
-                'sudo  %s %s' % (srv['dhcp_client'], ifce),
-                # Remove duplicated routing rules
-                'sudo ip route delete %s dev %s' % (subnet.cidr, ifce)
-            ):
-                stdin, stdout, stderr = ssh_clt.exec_command(cmd)
-                # Error is detected
-                if stdout.channel.recv_exit_status() != 0:
-                    raise ConfigInstanceError(stderr.read())
 
     def get_output_hot(self):
         """Output essential resources as a HOT template
@@ -249,8 +201,8 @@ class ServerChain(object):
 
                 # MARK: Only test RAW bash script
                 if srv.get('init_script', None):
-                    self.logger.info('Read the init bash script: %s'
-                                     % srv['init_script'])
+                    logger.debug('Read the init bash script: %s'
+                                 % srv['init_script'])
                     with open(srv['init_script'], 'r') as f:
                         # MARK: | is needed after user_data
                         prop.update(
@@ -268,8 +220,8 @@ class ServerChain(object):
         :param wait_complete (Bool): Block until the stack has the status complete
         """
         hot_str = self.get_output_hot()
-        self.logger.info('Create the server chain using HEAT, stack name: %s' %
-                         self.name)
+        logger.info('Create the server chain using HEAT, stack name: %s' %
+                    self.name)
         self.heat_client.stacks.create(stack_name=self.name,
                                        template=hot_str)
         if timeout:
@@ -288,8 +240,8 @@ class ServerChain(object):
                     'Creation of server chain:%s timeout!' % self.name)
 
     def delete(self, wait_complete=True, interval=3, timeout=600):
-        self.logger.info('Delete the server chain using HEAT, stacks name: %s' %
-                         self.name)
+        logger.info('Delete the server chain using HEAT, stacks name: %s' %
+                    self.name)
         sc_stack = self.conn.orchestration.find_stack(self.name)
         if not sc_stack:
             raise SFCRscError('Can not find stack with name: %s' %
@@ -376,7 +328,7 @@ class ServerChain(object):
                         ssh_clt.connect(fip, 22, srv['ssh']['user_name'],
                                         key_filename=srv['ssh']['pvt_key_file'])
                     except Exception:
-                        self.logger.warn(
+                        logger.warn(
                             '[FIP:%s] Can not connect to instance, try again after 3 seconds'
                             % fip
                         )
@@ -398,7 +350,7 @@ class ServerChain(object):
                     if status == 0:
                         break
                     else:
-                        self.logger.warn(
+                        logger.warn(
                             '[FIP:%s] Process is not running, recheck after 10 seconds.'
                             % fip
                         )
@@ -413,6 +365,7 @@ class ServerChain(object):
 
 
 class PortChain(object):
+
     """Port Chain
 
     Handles flow classifier, port pair, port pair group and port chain.
@@ -454,9 +407,9 @@ class PortChain(object):
         :param srv_chain (ServerChain):
         :param flow_conf:
         """
-        self.logger = logging.getLogger(__name__)
+        logger = logging.getLogger(__name__)
         self.conn = connection.Connection(**auth_args)
-        self.pc_client = netsfc_clt.SFCClient(auth_args, self.logger)
+        self.pc_client = netsfc_clt.SFCClient(auth_args, logger)
 
         self.name = name
         self.desc = desc
@@ -465,7 +418,7 @@ class PortChain(object):
 
     def create(self):
         """Create port chain"""
-        self.logger.info('Create port pairs and port pair groups.')
+        logger.info('Create port pairs and port pair groups.')
         srv_ppgrp_lst = self.srv_chain.get_srv_ppgrp_id()
         pp_grp_id_lst = list()
         for grp_idx, pp_grp in enumerate(srv_ppgrp_lst):
@@ -499,7 +452,7 @@ class PortChain(object):
         )
         self.flow_conf['logical_source_port'] = src_pt.id
         self.flow_conf['logical_destination_port'] = dst_pt.id
-        self.logger.info('Create the flow classifier.')
+        logger.info('Create the flow classifier.')
         self.pc_client.create('flow_classifier', self.flow_conf)
         fc_id = self.pc_client.get_id(
             'flow_classifier', self.flow_conf['name'])
@@ -510,20 +463,20 @@ class PortChain(object):
             'port_pair_groups': pp_grp_id_lst,
             'flow_classifiers': [fc_id]
         }
-        self.logger.info('Create the port chain: %s.' % self.name)
+        logger.info('Create the port chain: %s.' % self.name)
         self.pc_client.create('port_chain', pc_args)
 
     def delete(self):
         """Delete the port chain"""
-        self.logger.info('Delete the port chain: %s' % self.name)
+        logger.info('Delete the port chain: %s' % self.name)
         # Delete port chain
         self.pc_client.delete('port_chain', self.name)
 
-        self.logger.info('Delete the flow classifier.')
+        logger.info('Delete the flow classifier.')
         self.pc_client.delete('flow_classifier', self.flow_conf['name'])
 
         # Delete all port pair groups
-        self.logger.info('Delete port pair groups and port pairs.')
+        logger.info('Delete port pair groups and port pairs.')
         srv_ppgrp_lst = self.srv_chain.get_srv_ppgrp_id()
         for grp_idx in range(len(srv_ppgrp_lst)):
             pp_grp_name = 'pp_grp_%s' % grp_idx
@@ -540,7 +493,3 @@ class PortChain(object):
 # MARK: Dynamic management of the SFC SHOULD implemented in ./manager.py
 class SFC(object):
     pass
-
-
-if __name__ == "__main__":
-    print('Run tests...')

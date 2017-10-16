@@ -6,4 +6,4 @@
 
 export ELEMENTS_PATH=./elements
 # Build image with pre-installed packages
-DIB_RELEASE=trusty disk-image-create -o ubuntu-trusty.qcow2 -p tmux,tcpdump,bridge-utils vm ubuntu
+DIB_RELEASE=trusty disk-image-create -o ubuntu-trusty.qcow2 -p tmux,tcpdump,bridge-utils,openvswitch-switch vm ubuntu

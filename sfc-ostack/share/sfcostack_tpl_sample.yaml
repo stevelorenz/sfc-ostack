@@ -1,6 +1,10 @@
 #
 # About  : Sample template for ostacksfc
+#          Used for static creation of SFC
 # Format : YAML
+#
+# For flow_classifier parameters, check the official API ref:
+# https://docs.openstack.org/networking-sfc/latest/contributor/api.html
 #
 
 ---
@@ -13,7 +17,7 @@ log:
 cloud:
   # Authentication parameters
   auth:
-    auth_url: http://192.168.100.1/identity/v3
+    auth_url: http://192.168.0.1/identity/v3
     project_name: admin
     # Domain names are needed for API v3
     project_domain_name: default
@@ -23,16 +27,16 @@ cloud:
 
 # SFC(Service Function Chaining) configs
 SFC:
-  # FC(Function Chain) parameters
+  # Chain parameters
   function_chain:
-    name: udp_dst_9999
-    description: A Function chain for flows with destination UDP port 9999
+    name: udp_forwarding_dst_9999
+    description: A simple forwarding chain for flows with destination UDP port 9999
 
   # Flow classifier rules
-  # Rules for flow(s) that will be routed into the FC
+  # Rules for flow(s) that will be routed into the SFC
   flow_classifier:
-    name: udp_dst_9999_fc
-    description: UDP traffic from public network
+    name: udp_dst_9999
+    description: UDP traffic with destination port 9999
     # L2 ethertype. Can be IPv4 or IPv6 only.
     ethertype: IPv4
     protocol: UDP
@@ -41,37 +45,32 @@ SFC:
     destination_port_range_min: 9999
     destination_port_range_max: 9999
     # Source IPv4 or IPv6 prefix, as CIDR
-    source_ip_prefix: 10.0.0.1/32
-    destination_ip_prefix: 10.0.0.3/32
-    # ID of the source and destination neutron port
-    logical_source_port:
-    logical_destination_port:
+    source_ip_prefix: 10.0.0.3/32
+    destination_ip_prefix: 10.0.0.10/32
+    # Name of the source and destination neutron port
+    logical_source_port: src_pt
+    logical_destination_port: dst_pt
 
-    # TODO: IP of the source and destination neutron port
-    # logical_source_ip: 10.0.0.1
-    # logical_destination_ip: 10.0.0.3
-
-  # Neutron network for FC servers
+  # Neutron network for SF servers
+  # All SF servers are launched on the same neutron subnet
   network:
     net_name: net1
     subnet_name: subnet1
-    # This security group is added into all created neutron ports for FC servers
-    security_group_name: test
+    # MARK: To be supported in networking-sfc extension
+    # This security group SHOULD be added into all created neutron ports for FC servers
+    # security_group_name: test
 
-  # FC servers
-  server:
+  # SF servers
+  server_chain:
     # Name of the server
     chn1:
       # Sequence number in the FC
       seq_num: 1
-      # Name of the ingress and egress interfaces in OS
-      ifce: [eth1, eth2]
-      # Command for configuring interface with DHCP
-      dhcp_client: dhclient
       image: ubuntu-cloud
       flavor: m.test
-      ssh:
+      init_script: ./init_sf.sh
       # SSH configs
+      ssh:
         user_name: ubuntu
         # Name of the public key
         pub_key_name: test
@@ -81,21 +80,9 @@ SFC:
     # Use ubuntu cloud
     chn2:
       seq_num: 2
-      ifce: [eth1, eth2]
-      dhcp_client: dhclient
       image: ubuntu-cloud
       flavor: m.test
-      ssh:
-        user_name: ubuntu
-        pub_key_name: test
-        pvt_key_file: ./test.pem
-
-    chn3:
-      seq_num: 3
-      ifce: [eth1, eth2]
-      dhcp_client: dhclient
-      image: ubuntu-cloud
-      flavor: m.test
+      init_script: ./init_sf.sh
       ssh:
         user_name: ubuntu
         pub_key_name: test

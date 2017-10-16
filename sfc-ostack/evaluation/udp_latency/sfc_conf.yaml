@@ -2,12 +2,13 @@
 
 log:
 
-  level: INFO
+  level: DEBUG
 
 cloud:
 
   auth:
     auth_url: http://192.168.100.1/identity/v3
+    # auth_url: http://192.168.0.100/identity/v3
     project_name: admin
     project_domain_name: default
     username: admin
@@ -29,14 +30,15 @@ SFC:
     source_port_range_max: 65535
     destination_port_range_min: 9999
     destination_port_range_max: 9999
-    source_ip_prefix: 10.0.0.3/32
-    destination_ip_prefix: 10.0.0.10/32
-    logical_source_port: src_pt
+    source_ip_prefix: 192.168.100.1/32
+    destination_ip_prefix: 10.0.0.7/32
+    logical_source_port: gw
     logical_destination_port: dst_pt
 
   network:
     net_name: net1
     subnet_name: subnet1
+    # security_group_name: sfc_test
 
   server_chain:
 

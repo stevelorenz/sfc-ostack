@@ -15,6 +15,8 @@ from collections import OrderedDict
 
 import yaml
 
+from sfcostack.log import logger
+
 
 class HOTError(Exception):
     """HOT Error"""
@@ -65,8 +67,7 @@ class Output(object):
         if self.desc:
             return {self.name: {'value': self.value,
                                 'description': self.desc}}
-        else:
-            return {self.name: {'value': self.value}}
+        return {self.name: {'value': self.value}}
 
 
 class Resource(object):
@@ -86,7 +87,6 @@ class Resource(object):
 
     def __init__(self, name, type=None, prop=None, metadata=None, depends_on=None):
         """Init a HOT resource"""
-        self.logger = logging.getLogger(__name__)
         self.name = name
         self.type = self.RSC_TYPE_MAP.get(type, None)
         if not self.type:
@@ -123,15 +123,14 @@ class HOT(object):
         :param ver (str): Heat template version
         :param desc (str): Description of the template
         """
-        self.logger = logging.getLogger(__name__)
-
         self.ver = ver
         self.desc = desc
         self.parameter_lst = []
         self.resource_lst = []
         self.output_lst = []
 
-    def _repr_ordereddict(self, dumper, data):
+    @staticmethod
+    def _repr_ordereddict(dumper, data):
         """Represent OrderedDict as YAML node"""
         nodes = []
         for key, value in data.items():

@@ -24,13 +24,13 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.2',
+    version='0.0.1',
 
-    description='A simple OpenStack-SFC manager framework',
+    description='Research framework for Service Function Chaining on OpenStack ',
     long_description=long_description,
 
     # The project's main homepage.
-    url='https://bitbucket.org/comnets/sfc-openstack',
+    url='https://github.com/stevelorenz/sfc-ostack',
 
     # Author details
     author='Zuo Xiang',
@@ -67,7 +67,8 @@ setup(
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=find_packages(exclude=['venv', 'demo', 'doc' 'share']),
+    packages=find_packages(
+        exclude=['venv', 'demo', 'evaluation' 'doc' 'share']),
 
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:

@@ -11,6 +11,10 @@ import logging
 
 import yaml
 
+from sfcostack import log
+
+logger = log.logger
+
 # Supported conf format
 SUP_FMT = ('yaml', )
 
@@ -30,7 +34,6 @@ class ConfigHolder(object):
         :param fmt (str): The format of config. e.g. YAML
         :param url (str): The URL of config.
         """
-        self.logger = logging.getLogger(__name__)
         self.conf_parser = ConfigParser(fmt)
         self.conf_dict = self.conf_parser.load(url)
         self._conf_logger()
@@ -38,17 +41,7 @@ class ConfigHolder(object):
     def _conf_logger(self):
         """Config shared logger"""
         log_conf = self.conf_dict['log']
-        # default format string
-        fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-        level = {
-            'INFO': logging.INFO,
-            'DEBUG': logging.DEBUG,
-            'ERROR': logging.ERROR
-        }
-        logging.basicConfig(level=level[log_conf['level']],
-                            # MARK: current only use console output
-                            handlers=[logging.StreamHandler()],
-                            format=fmt_str)
+        log.conf_logger(level=log_conf['level'].lower())
 
     #######################
     #  Get Main Sections  #
@@ -69,7 +62,8 @@ class ConfigHolder(object):
         if 'SFC' not in self.conf_dict:
             raise ConfigError('Missing SFC configs!')
         sfc_conf = self.conf_dict['SFC']
-        for sec in ('flow_classifier', 'network', 'server_chain'):
+        for sec in ('function_chain', 'flow_classifier', 'network',
+                    'server_chain'):
             if sec not in sfc_conf:
                 raise ConfigError('Missing %s configs in SFC section!' % sec)
         return sfc_conf
@@ -102,13 +96,14 @@ class ConfigHolder(object):
         """
         srv_conf = self._get_sfc_conf()['server_chain']
         if not srv_conf:
+            logger.warning('No SF server(s) described in the conf file.')
             return []
         # TODO: Add support for server group
         srv_grp_lst = [0] * len(srv_conf)
         for srv, conf in srv_conf.items():
             conf['name'] = srv
             if srv_grp_lst[conf['seq_num'] - 1] != 0:
-                raise ConfigError('Duplicated server sequence number')
+                raise ConfigError('Duplicated server sequence number.')
             srv_grp_lst[conf['seq_num'] - 1] = [conf]
         return srv_grp_lst
 
@@ -119,7 +114,6 @@ class ConfigParser(object):
 
     def __init__(self, fmt):
         """Init a ConfigParser"""
-        self.logger = logging.getLogger(__name__)
         if fmt == 'yaml':
             self.fmt = 'yaml'
         else:
@@ -143,12 +137,3 @@ class ConfigParser(object):
         if self.fmt == 'yaml':
             with open(url, 'r') as stream:
                 yaml.dump(stream)
-
-
-if __name__ == "__main__":
-    print('Run basic test...')
-    conf_hd = ConfigHolder('yaml', './conf_example.yaml')
-    print('Flow configs:')
-    print(conf_hd.get_sfc_flow())
-    print('SFC server configs:')
-    print(conf_hd.get_sfc_server())

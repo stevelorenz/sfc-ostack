@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-About : Timer for SFC creation time
+About : Timer for SFC start time
         Try to have high accuracy
 
 Email : xianglinks@gmail.com
@@ -30,68 +30,18 @@ MAX_ALLOWED_UDP_PAYLOAD = (512 - 18)
 RECV_BUFFER_SIZE = 512
 
 
-def run_server_al(addr):
-    """Run UDP server with maximal allowed latency mode
-
-    MARK: According to the result, this method seems to be stupid...
-    """
-    logger.warn('According to result, this method is not stable...')
-    round_num, pack_num = 0, 0
-    # Store chain creation time
-    chn_ct_lst = list()
-    # Queue to store time stamps of received packets
-    recv_ts_que = deque(maxlen=int(1e6))
-    recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
-                              socket.IPPROTO_UDP)
-    recv_sock.bind(addr)
-    # MARK: the socket is put in blocking mode.
-    recv_sock.settimeout(None)
-    logger.debug('Recv socket is ready, bind to %s:%s' % (addr))
-    try:
-        while round_num < TEST_ROUND:
-            pack = recv_sock.recv(RECV_BUFFER_SIZE)
-            now_ts = time.time()
-            pack_num += 1
-            if len(recv_ts_que) == 0:
-                logger.debug('Recv first packet, recv_ts: %f' % (now_ts))
-                recv_ts_que.append(now_ts)
-            # Check the recv delay
-            else:
-                last_ts = recv_ts_que[-1]
-                logger.debug('Time stamp: now: %f, last: %f' %
-                             (now_ts, last_ts))
-                delay = now_ts - last_ts
-                recv_ts_que.append(now_ts)
-                logger.debug('Recv packet number: %d, delay:%.3f' %
-                             (pack_num, delay))
-                # SHOULD be chain creation delay
-                if delay >= MAX_ALLOWED_DELAY:
-                    chn_ct_lst.append(delay)
-                    round_num += 1
-                    logger.debug('[CT_Delay] delay: %f, round_num: %d'
-                                 % (delay, round_num))
-    except KeyboardInterrupt:
-        logger.info('KeyboardInterrupt')
-        sys.exit(0)
-    else:
-        # Store test result in a csv file
-        with open(OUTPUT_FILE, 'w') as out_file:
-            for delay in chn_ct_lst:
-                out_file.write("%s\n" % delay)
-    finally:
-        recv_sock.close()
-
-
-def run_server_pm(addr):
+def run_server_pm(addr, output_file=False):
     """Run UDP server with payload modification mode
 
     - The client send packet(payload) with first byte b'a' - old payload
     - The SFs in the chain modify the first byte to b'b' - new payload
+
+    :return sfc_ts_lst (list): A list of time stamps for SFC
     """
     round_num = 0
     last_old_pload_ts = 0  # time stamp for last old payload
     # List of SFC creation latency
-    chn_ct_lst = list()
+    sfc_ts_lst = list()
     chn_created = False
 
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
@@ -102,22 +52,22 @@ def run_server_pm(addr):
     try:
         while round_num < TEST_ROUND:
             # For current test round
-            cr_chn_ct = list()
+            ct_ts_lst = list()
             pack = recv_sock.recv(RECV_BUFFER_SIZE)
 
             # SFC is not created
             if pack.startswith(b'a'):
                 chn_created = False
                 # Update time stamp for old payload
-                last_old_pload_ts = time.time()
+                last_old_pload_ts = time.time()  # float
                 logger.debug('Recv a A packet. last ts: %s' %
                              last_old_pload_ts)
 
             if pack.startswith(b'b'):
-                recv_bpack_ts = time.time()
+                recv_bpack_ts = time.time()  # float
                 logger.debug('Recv a B packet. ts: %s' % recv_bpack_ts)
                 if not chn_created:
-                    logger.debug('SFC is just created')
+                    logger.debug('SFC is just created.')
                     chn_created = True
                     # Total SFC creation delay
                     # Unpack time stamp data in the payload
@@ -127,13 +77,13 @@ def run_server_pm(addr):
                     logger.debug('Time stamp str after strip: %s' % ts_str)
                     # A list of time stamps
                     # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
+                    ct_ts_lst.append(last_old_pload_ts)
                     ts_lst = ts_str.split(',')
                     ts_lst.append(recv_bpack_ts)
-                    cr_chn_ct.extend(ts_lst)
-                    cr_chn_ct.append(last_old_pload_ts)
-                    cr_chn_ct_str = ','.join(map(str, cr_chn_ct))
-                    logger.debug('Current ct str %s' % cr_chn_ct_str)
-                    chn_ct_lst.append(cr_chn_ct)
+                    ct_ts_lst.extend(map(float, ts_lst))
+                    # cr_chn_ts_str = ','.join(map(str, ct_ts_lst))
+                    # logger.debug('Current ct str %s' % cr_chn_ts_str)
+                    sfc_ts_lst.append(ct_ts_lst)
                     round_num += 1
                 else:
                     logger.debug('SFC is already created.')
@@ -142,13 +92,21 @@ def run_server_pm(addr):
         logger.info('KeyboardInterrupt')
         sys.exit(0)
     else:
-        logger.debug('Write test results in file')
-        # Store test result in a csv file
-        with open(OUTPUT_FILE, 'w') as out_file:
-            for delay in chn_ct_lst:
-                out_file.write("%s\n" % delay)
+        logger.debug('Finish %d rounds of tests' % TEST_ROUND)
+
+        if output_file:
+            with open('./hello.csv', 'w+') as test_f:
+                pass
+            # Store test result in a csv file
+            with open(OUTPUT_FILE, 'w') as out_file:
+                for ts_lst in sfc_ts_lst:
+                    ts_lst = filter(lambda x: x != '', ts_lst)
+                    for ts in ts_lst:
+                        out_file.write("%s," % ts)
+                    out_file.write("\n")
     finally:
         recv_sock.close()
+        return sfc_ts_lst
 
 
 def run_client(addr):
@@ -185,7 +143,7 @@ if __name__ == "__main__":
     group.add_argument('-s', '--server', metavar='Address', type=str,
                        help='Run in UDP server mode')
     parser.add_argument('-m', '--mode', type=str,
-                        choices=['al', 'pm'], help='Mode for measurements')
+                        choices=['pm'], help='Mode for measurements')
     parser.add_argument('-d', '--max_delay', type=float, default=0.005,
                         help='Maximal allowed packet latency in second')
     parser.add_argument('-r', '--round', type=int, default=5,
@@ -223,14 +181,6 @@ if __name__ == "__main__":
         addr = (ip, int(port))
         TEST_ROUND = args.round
         OUTPUT_FILE = args.output_file
-        if args.mode == 'al':
-            # MARK: This parameter is import, theoretic difference SHOULD be 2 packets
-            #       The minimal ratio SHOULD be 2 here
-            MAX_ALLOWED_DELAY = args.max_delay
-            info_str = ('Run in maximal allowed latency mode, max-lat: %f'
-                        % MAX_ALLOWED_DELAY)
-            logger.info('Run UDP server on %s:%s. %s' % (ip, port, info_str))
-            run_server_al(addr)
         if args.mode == 'pm':
             info_str = ('Run in payload modification mode.')
             logger.info('Run UDP server on %s:%s. %s' % (ip, port, info_str))
