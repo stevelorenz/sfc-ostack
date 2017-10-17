@@ -79,13 +79,15 @@ uninstall-all-pkgs:
 #  Local Dev  #
 ###############
 
-CUR_LOC = $(shell pwd)
 LOCAL_LOC="/opt/stack/dev_project/sfc-ostack-gh"
 TEST_SERVER="zuo@192.168.157.81"
 REMOTE_LOC="~/"
 
+try-upload-test-server:
+	@rsync -n -rav -e ssh --exclude="venv" --exclude=".git" --progress --delete $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
+
 upload-test-server:
-	@echo "Upload to the remote test server: $(TEST_SERVER)"
-	@rsync -rav -e ssh --exclude="venv" --progress --delete $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
+	@echo "Upload $(LOCAL_LOC) to remote test server, $(TEST_SERVER):$(REMOTE_LOC)"
+	@rsync -rav -e ssh --exclude="venv" --exclude=".git" --progress --delete $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
 
 # vim:ft=make

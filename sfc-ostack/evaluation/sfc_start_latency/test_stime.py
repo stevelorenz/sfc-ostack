@@ -41,7 +41,7 @@ def test_sfc_ct(mode=0):
 
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
         if not DEBUG_MODE:
-            ts_out_file = 'sfts-s%d-m%d.csv' % (srv_num, mode)
+            ts_out_file = 'sfc-ts-ins-%d-%d.csv' % (mode, srv_num)
             CRT_RUN_CTIMER = RUN_CTIMER
             CRT_RUN_CTIMER += '-o %s ' % ts_out_file
             CRT_RUN_CTIMER += '> /dev/null 2>&1 &'
@@ -62,7 +62,7 @@ def test_sfc_ct(mode=0):
                     print('[DEBUG] Connect to instance succeeded.')
                     break
             transport = ssh_clt.get_transport()
-            for i in range(5):
+            for i in range(3):
                 channel = transport.open_session()
                 print('[DEBUG] Run ctime_timer on recv instance.')
                 channel.exec_command(CRT_RUN_CTIMER)
@@ -77,16 +77,18 @@ def test_sfc_ct(mode=0):
         if mode == 0:
             print('[TEST] Run tests in mode 0.')
             # Chain start time stamp
-            start_ts_file = 'ccts-s%d.csv' % srv_num
+            start_ts_file = 'sfc-ts-ctl-%d.csv' % srv_num
             ccts_lst = list()
             for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
                 print('[DEBUG] Test round: %d' % round_num)
-                time.sleep(10)  # recv some A packets
+                time.sleep(3)  # recv some A packets
                 # Start ts of SFC start
                 ccts_lst.append(time.time())
                 srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=None)
                 port_chain = eva_sfc_mgr.create_pc(srv_chain)
-                time.sleep(10)  # recv some B packets
+                time.sleep(15 * srv_num)  # recv some B packets
+                # import ipdb
+                # ipdb.set_trace()
                 eva_sfc_mgr.delete_pc(port_chain)
                 eva_sfc_mgr.delete_sc(srv_chain)
                 time.sleep(3)

@@ -7,8 +7,8 @@
 ip link set eth1 up
 ip link set eth2 up
 
-SRC_IP=10.0.0.3
-DST_IP=10.0.0.10
+SRC_IP=10.0.0.6
+DST_IP=10.0.0.7
 
 BRIDGE_IP=192.168.0.1
 FAKE_INGRESS_IP=192.168.0.100

@@ -36,7 +36,8 @@ def pre_build_topo():
     img_args = {
         'name': 'ubuntu-cloud',
         # Path of the image
-        'path': os.getenv('HOME') + '/ostack_image/ubuntu-trusty-customized.qcow2',
+        # 'path': os.getenv('HOME') + '/ostack_image/ubuntu-trusty-customized.qcow2',
+        'path': '/opt/sfc-ostack/ubuntu-trusty.qcow2',
         'disk_format': 'qcow2',
         'container_format': 'bare',
         'visibility': 'public',

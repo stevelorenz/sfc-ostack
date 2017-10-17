@@ -14,7 +14,6 @@ import logging.handlers
 import socket
 import sys
 import time
-from collections import deque
 
 # Logger settings
 fmt_str = '%(asctime)s %(levelname)-8s %(message)s'
@@ -30,7 +29,7 @@ MAX_ALLOWED_UDP_PAYLOAD = (512 - 18)
 RECV_BUFFER_SIZE = 512
 
 
-def run_server_pm(addr, output_file=False):
+def run_server_pm(addr):
     """Run UDP server with payload modification mode
 
     - The client send packet(payload) with first byte b'a' - old payload
@@ -73,12 +72,10 @@ def run_server_pm(addr, output_file=False):
                     # Unpack time stamp data in the payload
                     ts_str = pack.decode('ascii')
                     logger.debug('Time stamp str before strip: %s' % ts_str)
-                    ts_str = ts_str.lstrip('b')
-                    logger.debug('Time stamp str after strip: %s' % ts_str)
-                    # A list of time stamps
                     # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
                     ct_ts_lst.append(last_old_pload_ts)
-                    ts_lst = ts_str.split(',')
+                    # First element: bbb...
+                    ts_lst = ts_str.split(',')[1:]
                     ts_lst.append(recv_bpack_ts)
                     ct_ts_lst.extend(map(float, ts_lst))
                     # cr_chn_ts_str = ','.join(map(str, ct_ts_lst))
@@ -94,13 +91,11 @@ def run_server_pm(addr, output_file=False):
     else:
         logger.debug('Finish %d rounds of tests' % TEST_ROUND)
 
-        if output_file:
-            with open('./hello.csv', 'w+') as test_f:
-                pass
+        if OUTPUT_FILE:
             # Store test result in a csv file
             with open(OUTPUT_FILE, 'w') as out_file:
                 for ts_lst in sfc_ts_lst:
-                    ts_lst = filter(lambda x: x != '', ts_lst)
+                    # ts_lst = filter(lambda x: x != '', ts_lst)
                     for ts in ts_lst:
                         out_file.write("%s," % ts)
                     out_file.write("\n")

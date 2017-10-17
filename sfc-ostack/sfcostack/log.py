@@ -22,7 +22,7 @@ LEVELS = {
 
 FORMAT = {
     'default': '%(asctime)s %(message)s',
-    'debug': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+    'debug': '%(asctime)s %(levelname)-8s %(module)s %(lineno)d %(message)s',
     'info': '%(asctime)s %(message)s'
 }
 
