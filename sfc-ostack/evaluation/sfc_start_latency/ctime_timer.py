@@ -11,6 +11,8 @@ Email : xianglinks@gmail.com
 import argparse
 import logging
 import logging.handlers
+import signal
+import os
 import socket
 import sys
 import time
@@ -37,10 +39,7 @@ def run_server_pm(addr):
 
     :return sfc_ts_lst (list): A list of time stamps for SFC
     """
-    round_num = 0
-    last_old_pload_ts = 0  # time stamp for last old payload
-    # List of SFC creation latency
-    sfc_ts_lst = list()
+    last_old_pload_ts = '0'  # time stamp for last old payload
     chn_created = False
 
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
@@ -48,22 +47,46 @@ def run_server_pm(addr):
     recv_sock.bind(addr)
     recv_sock.settimeout(None)
 
+    csv_file = open(OUTPUT_FILE, 'a+')
+
+    def exit_server(*args):
+        logger.debug('SIGTERM detected.')
+        recv_sock.close()
+        # Sync buffered data to the disk
+        csv_file.flush()
+        os.fsync(csv_file.fileno())
+        csv_file.close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, exit_server)
+
     try:
-        while round_num < TEST_ROUND:
-            # For current test round
-            ct_ts_lst = list()
+        # MARK: Keep running until the process is killed
+        round_num = 0
+        while True:
             pack = recv_sock.recv(RECV_BUFFER_SIZE)
+
+            # if round_num % 2 == 0:
+            #     pack = b'a1234'
+            # else:
+            #     pack = b'b,1234,5678'
+
+            # time.sleep(1)
 
             # SFC is not created
             if pack.startswith(b'a'):
                 chn_created = False
                 # Update time stamp for old payload
-                last_old_pload_ts = time.time()  # float
-                logger.debug('Recv a A packet. last ts: %s' %
-                             last_old_pload_ts)
+                last_old_pload_ts = str(time.time())
+                # Used for checking time sync status
+                apack_info = (
+                    'ts: %s, Recv a A packet: %s. last a pack ts: %s'
+                    % (time.time(), pack.decode('ascii'), last_old_pload_ts)
+                )
+                logger.debug(apack_info)
 
             if pack.startswith(b'b'):
-                recv_bpack_ts = time.time()  # float
+                recv_bpack_ts = str(time.time())
                 logger.debug('Recv a B packet. ts: %s' % recv_bpack_ts)
                 if not chn_created:
                     logger.debug('SFC is just created.')
@@ -73,35 +96,22 @@ def run_server_pm(addr):
                     ts_str = pack.decode('ascii')
                     logger.debug('Time stamp str before strip: %s' % ts_str)
                     # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
-                    ct_ts_lst.append(last_old_pload_ts)
                     # First element: bbb...
                     ts_lst = ts_str.split(',')[1:]
                     ts_lst.append(recv_bpack_ts)
-                    ct_ts_lst.extend(map(float, ts_lst))
-                    # cr_chn_ts_str = ','.join(map(str, ct_ts_lst))
-                    # logger.debug('Current ct str %s' % cr_chn_ts_str)
-                    sfc_ts_lst.append(ct_ts_lst)
-                    round_num += 1
+                    ts_lst.append(last_old_pload_ts)
+                    try:
+                        csv_file.write(','.join(ts_lst))
+                        csv_file.write('\n')
+                    except ValueError:
+                        sys.exit(0)
                 else:
                     logger.debug('SFC is already created.')
                     logger.debug('Payload: %s' % pack.decode('ascii'))
+            round_num += 1
     except KeyboardInterrupt:
         logger.info('KeyboardInterrupt')
         sys.exit(0)
-    else:
-        logger.debug('Finish %d rounds of tests' % TEST_ROUND)
-
-        if OUTPUT_FILE:
-            # Store test result in a csv file
-            with open(OUTPUT_FILE, 'w') as out_file:
-                for ts_lst in sfc_ts_lst:
-                    # ts_lst = filter(lambda x: x != '', ts_lst)
-                    for ts in ts_lst:
-                        out_file.write("%s," % ts)
-                    out_file.write("\n")
-    finally:
-        recv_sock.close()
-        return sfc_ts_lst
 
 
 def run_client(addr):
@@ -111,21 +121,24 @@ def run_client(addr):
     MARK: The accuracy of the time.sleep() depends on the underlying OS
     The OS usually ONLY support millisecond sleeps
     """
+
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    base_payload = b'a' * PAYLOAD_LEN
-    try:
-        while True:
-            # Send time stamp
-            send_ts_b = str(time.time()).encode('ascii')
-            payload = b','.join((base_payload, send_ts_b))
-            logger.debug('Send payload: %s' % payload.decode('ascii'))
-            send_sock.sendto(payload, addr)
-            time.sleep(SEND_INTERVAL)
-    except KeyboardInterrupt:
-        logger.info('KeyboardInterrupt')
-        sys.exit(0)
-    finally:
+
+    def exit_client(*args):
+        logger.debug('SIGTERM detected.')
         send_sock.close()
+        sys.exit()
+
+    signal.signal(signal.SIGTERM, exit_client)
+
+    base_payload = b'a' * PAYLOAD_LEN
+    while True:
+        # Send time stamp
+        send_ts_b = str(time.time()).encode('ascii')
+        payload = b','.join((base_payload, send_ts_b))
+        logger.debug('Send payload: %s' % payload.decode('ascii'))
+        send_sock.sendto(payload, addr)
+        time.sleep(SEND_INTERVAL)
 
 
 if __name__ == "__main__":

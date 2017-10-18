@@ -29,6 +29,7 @@ SFC:
     source_port_range_max: 65535
     destination_port_range_min: 9999
     destination_port_range_max: 9999
+    # MARK: Set the IP after building test topo
     source_ip_prefix: 10.0.0.6/32
     destination_ip_prefix: 10.0.0.7/32
     logical_source_port: src_pt

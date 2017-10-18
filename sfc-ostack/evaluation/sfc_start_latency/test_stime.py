@@ -32,44 +32,41 @@ def _get_floating_ip(pt_name):
     return fip
 
 
-def test_sfc_ct(mode=0):
-    """Test chain start time
+def _ssh_cmd(ip, port, user, ssh_key, cmd):
+    ssh_clt = paramiko.SSHClient()
+    ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    while True:
+        try:
+            ssh_clt.connect(ip, port, user,
+                            key_filename=ssh_key)
+        except Exception:
+            time.sleep(3)
+        else:
+            print('[DEBUG] Connect to instance succeeded.')
+            break
+    tran = ssh_clt.get_transport()
+    for i in range(3):
+        channel = tran.open_session()
+        channel.exec_command(cmd)
+        status = channel.recv_exit_status()
+        print('[DEBUG] Command status: %d' % status)
+        time.sleep(3)
+    ssh_clt.close()
 
-    MARK: SHOULD be split into small funcs...
-    """
+
+def test_sfc_ct(mode=0):
+    """Test chain start time"""
     print('[TEST] Test SFC start time with python forwarding.')
 
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
-        if not DEBUG_MODE:
-            ts_out_file = 'sfc-ts-ins-%d-%d.csv' % (mode, srv_num)
-            CRT_RUN_CTIMER = RUN_CTIMER
-            CRT_RUN_CTIMER += '-o %s ' % ts_out_file
-            CRT_RUN_CTIMER += '> /dev/null 2>&1 &'
-            print('[DEBUG] Cmd for running CTimer: %s' % CRT_RUN_CTIMER)
-            # Run timer on the dst instance
-            ssh_clt = paramiko.SSHClient()
-            ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            while True:
-                try:
-                    ssh_clt.connect(DST_FIP, 22, SSH_USER,
-                                    key_filename=SSH_PKEY)
-                except Exception:
-                    print(
-                        '[Error] Can not connect instance, try again after 3 seconds'
-                    )
-                    time.sleep(3)
-                else:
-                    print('[DEBUG] Connect to instance succeeded.')
-                    break
-            transport = ssh_clt.get_transport()
-            for i in range(3):
-                channel = transport.open_session()
-                print('[DEBUG] Run ctime_timer on recv instance.')
-                channel.exec_command(CRT_RUN_CTIMER)
-                status = channel.recv_exit_status()
-                print('[DEBUG] ctime_timer process status: %d' % status)
-                time.sleep(3)
-            ssh_clt.close()
+        ts_out_file = 'sfc-ts-ins-%d-%d.csv' % (mode, srv_num)
+        CRT_RUN_CTIMER = RUN_CTIMER
+        CRT_RUN_CTIMER += '-o %s ' % ts_out_file
+        CRT_RUN_CTIMER += '-l ERROR > /dev/null 2>&1 &'
+        print('[DEBUG] Cmd for running CTimer: %s' % CRT_RUN_CTIMER)
+        # Run timer on the dst instance
+        _ssh_cmd(DST_FIP, 22, SSH_USER, SSH_PKEY, CRT_RUN_CTIMER)
+        time.sleep(3)
 
         print('[DEBUG] Start creating and deleting SFC')
         eva_sfc_mgr = EvaSFCMgr(SFC_CONF, INIT_SCRIPT)
@@ -93,26 +90,31 @@ def test_sfc_ct(mode=0):
                 eva_sfc_mgr.delete_sc(srv_chain)
                 time.sleep(3)
 
+        if mode == 1:
+            # TODO: should test after implementaion of SF manager
+            pass
+            # print('[TEST] Run tests in mode 1.')
+            # srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=15)
+            # for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
+            #     print('[DEBUG] Test round: %d' % round_num)
+            #     time.sleep(10)  # recv some A packets
+            #     # Create the port chain
+            #     port_chain = eva_sfc_mgr.create_pc(srv_chain)
+            #     time.sleep(10)  # recv some B packets
+            #     # Delete the port chain
+            #     eva_sfc_mgr.delete_pc(port_chain)
+            #     time.sleep(3)
+            # time.sleep(3)
+
+            # eva_sfc_mgr.delete_sc(srv_chain)
+
         with open(start_ts_file, 'w+') as csv_f:
             for ts in ccts_lst:
                 csv_f.write('%f\n' % ts)
 
-        # MARK: Do not re-create the ServerChain, only re-create PortChain
-        if mode == 1:
-            print('[TEST] Run tests in mode 1.')
-            srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=15)
-            for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
-                print('[DEBUG] Test round: %d' % round_num)
-                time.sleep(10)  # recv some A packets
-                # Create the port chain
-                port_chain = eva_sfc_mgr.create_pc(srv_chain)
-                time.sleep(10)  # recv some B packets
-                # Delete the port chain
-                eva_sfc_mgr.delete_pc(port_chain)
-                time.sleep(3)
-            time.sleep(3)
-
-            eva_sfc_mgr.delete_sc(srv_chain)
+        # Kill timer on dst instance
+        _ssh_cmd(DST_FIP, 22, SSH_USER, SSH_PKEY, KILL_CTIMER)
+        time.sleep(3)
 
 
 if __name__ == "__main__":
@@ -138,8 +140,8 @@ if __name__ == "__main__":
     ap.add_argument('--full_clean',
                     help='Also kill ctime_timer process on dst instance',
                     action='store_true')
-    ap.add_argument('--debug', help='Run in debug mode...',
-                    action='store_true')
+    # ap.add_argument('--debug', help='Run in debug mode...',
+    #                 action='store_true')
 
     if len(sys.argv) == 1:
         ap.print_help()
@@ -186,7 +188,7 @@ if __name__ == "__main__":
 
     # Try to cleanup all old resouces
     if args.clean or args.full_clean:
-        print('[INFO] Run simple clean func')
+        print('[INFO] Run clean func')
         for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
             try:
                 subprocess.run(
@@ -197,31 +199,8 @@ if __name__ == "__main__":
                 pass
             if args.full_clean:
                 print('[INFO] Run full clean func')
-                ssh_clt = paramiko.SSHClient()
-                ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                while True:
-                    try:
-                        ssh_clt.connect(DST_FIP, 22, SSH_USER,
-                                        key_filename=SSH_PKEY)
-                    except Exception:
-                        print(
-                            '[Error] Can not connect instance, try again after 3 seconds'
-                        )
-                        time.sleep(3)
-                    else:
-                        print('[DEBUG] Connect to instance succeeded.')
-                        break
-                transport = ssh_clt.get_transport()
-                for i in range(5):
-                    channel = transport.open_session()
-                    print('[DEBUG] Kill ctime_timer on recv instance.')
-                    channel.exec_command(KILL_CTIMER)
-                    status = channel.recv_exit_status()
-                    print('[DEBUG] ctime_timer process status: %d' % status)
-                ssh_clt.close()
+                _ssh_cmd(DST_FIP, 22, SSH_USER, SSH_PKEY, KILL_CTIMER)
             sys.exit(0)
-
-    DEBUG_MODE = args.debug
 
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
 

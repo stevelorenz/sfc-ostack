@@ -52,5 +52,9 @@ ovs-ofctl add-flow br0 "in_port=local actions=mod_nw_src:$SRC_IP,mod_nw_dst:$DST
 #  Run Python Forwarder  #
 ##########################
 
+# Sync time with NTP, NECESSARY for SF latency measurements
+curl 192.168.100.1:8888/init_ntp_client.sh -o /home/ubuntu/init_ntp_client.sh
+sudo sh /home/ubuntu/init_ntp_client.sh > /dev/null 2>&1 &
+
 curl 192.168.100.1:8888/forwarder.py -o /home/ubuntu/forwarder.py
-python3 /home/ubuntu/forwarder.py "$DST_IP:9999" > /dev/null 2>&1 &
+python3 /home/ubuntu/forwarder.py "$DST_IP:9999" -l ERROR > /dev/null 2>&1 &
