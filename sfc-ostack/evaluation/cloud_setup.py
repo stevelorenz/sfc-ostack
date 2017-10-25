@@ -21,7 +21,7 @@ def pre_build_topo():
     """pre_build_topo"""
 
     auth_args = {
-        'auth_url': 'http://192.168.100.1/identity/v3',
+        'auth_url': 'http://192.168.12.10/identity/v3',
         'project_name': 'admin',
         'user_domain_name': 'default',
         'project_domain_name': 'default',
@@ -37,7 +37,7 @@ def pre_build_topo():
         'name': 'ubuntu-cloud',
         # Path of the image
         # 'path': os.getenv('HOME') + '/ostack_image/ubuntu-trusty-customized.qcow2',
-        'path': '/opt/sfc-ostack/ubuntu-trusty.qcow2',
+        'path': '/opt/stack/sfcostack/ubuntu-trusty.qcow2',
         'disk_format': 'qcow2',
         'container_format': 'bare',
         'visibility': 'public',

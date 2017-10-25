@@ -8,9 +8,9 @@
 
 MIN_SF_NUM=1
 MAX_SF_NUM=1
-TEST_ROUND=5
+TEST_ROUND=1
 ADD_ROUND=0
-MODE=0
+MODE=1
 SEND_INTERVAL=0.001
 
 # Fix IP and port
@@ -30,11 +30,12 @@ timer_srv_cmd="nohup python3 /home/ubuntu/ctime_timer.py -c $DST_IP:$DST_PORT --
 echo "# Run chain cleanups"
 python3 ./test_stime.py "$MIN_SF_NUM" "$MAX_SF_NUM" "$DST_IP:$DST_PORT" "$DST_FIP" -r "$TEST_ROUND" --clean > /dev/null 2>&1
 
-# Run a simple HTTP server for file sharing among SF instances
 echo "# Run HTTP server on port 8888"
 python3 -m http.server 8888 > /dev/null 2>&1 &
 
-# Copy and run ctimer on src, dst instances
+echo "# Delete all CSV files on dst instance"
+ssh -i "$SSH_PKEY" "ubuntu@$DST_FIP" "rm ~/*.csv"
+
 echo "# Copy ctime_timer to src and dst server"
 scp -i "$SSH_PKEY" ./ctime_timer.py "ubuntu@$SRC_FIP":~/
 scp -i "$SSH_PKEY" ./ctime_timer.py "ubuntu@$DST_FIP":~/
@@ -45,7 +46,7 @@ scp -i "$SSH_PKEY" ./init_ntp_client.sh "ubuntu@$DST_FIP":~/
 ssh -i "$SSH_PKEY" "ubuntu@$SRC_FIP" "sudo sh ./init_ntp_client.sh" > /dev/null 2>&1
 ssh -i "$SSH_PKEY" "ubuntu@$DST_FIP" "sudo sh ./init_ntp_client.sh" > /dev/null 2>&1
 echo "# Wait some time for NTP synchronization..."
-sleep 30
+#sleep 30
 
 echo "# Restart ctime_timer client on src instance"
 ssh -i "$SSH_PKEY" "ubuntu@$SRC_FIP" "killall python3"
@@ -62,6 +63,5 @@ ssh -i "$SSH_PKEY" "ubuntu@$SRC_FIP" "killall python3"
 ssh -i "$SSH_PKEY" "ubuntu@$DST_FIP" "killall python3"
 python3 ./test_stime.py "$MIN_SF_NUM" "$MAX_SF_NUM" "$DST_IP:$DST_PORT" "$DST_FIP" -r "$TEST_ROUND" --clean > /dev/null 2>&1
 
-# Copy all CSV data
 echo "# Copy CSV data from dst server"
 scp -i "$SSH_PKEY" "ubuntu@$DST_FIP":/home/ubuntu/*.csv ./

@@ -14,6 +14,8 @@ cat >/etc/chrony/chrony.conf <<EOL
 # The range of floating IPs
 allow 192.168.100.0/24
 
+server time.zih.tu-dresden.de iburst
+
 keyfile /etc/chrony/chrony.keys
 
 dumpdir /var/lib/chrony

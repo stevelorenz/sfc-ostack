@@ -33,6 +33,7 @@ class EvaSFCMgr(object):
 
     def __init__(self, conf_file, init_script):
         conf_hd = conf.ConfigHolder('yaml', conf_file)
+        self.conf_hd = conf_hd
         self.auth_args = conf_hd.get_cloud_auth()
         self.flow_conf = conf_hd.get_sfc_flow()
         self.net_conf = conf_hd.get_sfc_net()

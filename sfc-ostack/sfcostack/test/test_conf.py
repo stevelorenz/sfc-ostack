@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 
@@ -15,24 +15,5 @@ conf_sample_path = os.path.join(
     '../../share/sfcostack_tpl_sample.yaml'
 )
 
-#################
-#  Conf Parser  #
-#################
-
-#################
-#  Conf Holder  #
-#################
-
-conf_hd = conf.ConfigHolder('yaml', conf_sample_path)
-
-
-def test_conf_holder():
-    auth_args = {
-        'auth_url': 'http://192.168.0.1/identity/v3',
-        'project_name': 'admin',
-        'user_domain_name': 'default',
-        'project_domain_name': 'default',
-        'username': 'admin',
-        'password': 'stack',
-    }
-    assert conf_hd.get_cloud_auth() == auth_args
+sfc_conf = conf.SFCConf()
+sfc_conf.load_file(conf_sample_path)

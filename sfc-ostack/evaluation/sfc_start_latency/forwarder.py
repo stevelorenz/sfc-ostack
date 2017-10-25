@@ -3,8 +3,10 @@
 # vim:fenc=utf-8
 
 """
-About: Forward packet and add a time stamp in the payload
-       Use threading
+About: Forward UDP packet and add a time stamp in the payload
+
+       A 'ready' packet will be sent to the controller IP if forwarding threads
+       run successfully.
 
 Email: xianglinks@gmail.com
 """
@@ -66,10 +68,13 @@ def recv():
         )
 
 
-def resp_mgn():
-    """TODO: Open a socket for responsing the manage messages from central
-    controller"""
-    pass
+def send_ready():
+    """Send a ready packet to the controller"""
+    send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
+                              socket.IPPROTO_UDP)
+    send_sock.settimeout(None)
+    payload = 'SF is ready!'
+    send_sock.sendto(payload, (DST_IP, DST_PORT))
 
 
 if __name__ == "__main__":
@@ -78,7 +83,10 @@ if __name__ == "__main__":
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument('dst_addr', type=str,
-                        help='Addr of destination instance.')
+                        help='Address of destination instance.')
+    parser.add_argument('ctl_addr', type=str,
+                        help='Address of controller instance.')
+
     parser.add_argument('-l', '--log_level', type=str, help='Logging level',
                         default='INFO')
 
@@ -87,10 +95,13 @@ if __name__ == "__main__":
                         handlers=[logging.StreamHandler()],
                         format=fmt_str)
 
-    # Addr for dst instance
     ip, port = args.dst_addr.split(':')
     DST_IP = ip
     DST_PORT = int(port)
+
+    ip, port = args.ctl_addr.split(':')
+    CTL_IP = ip
+    CTL_PORT = int(port)
 
     # IP of OVS local port
     RECV_IP = "192.168.0.1"
@@ -105,6 +116,9 @@ if __name__ == "__main__":
     send_thread = threading.Thread(target=send)
     recv_thread.start()
     send_thread.start()
+
+    # Send SF ready packet
+    send_ready()
 
     # Block main thread
     recv_thread.join()

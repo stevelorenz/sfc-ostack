@@ -21,9 +21,11 @@ sys.path.insert(0, '../')
 import time
 
 import paramiko
-from openstack import connection
 
+from openstack import connection
 from sfc_mgr import EvaSFCMgr
+from sfcostack import conf
+from sfcostack.sfc import manager
 
 
 def _get_floating_ip(pt_name):
@@ -51,6 +53,7 @@ def _ssh_cmd(ip, port, user, ssh_key, cmd):
         status = channel.recv_exit_status()
         print('[DEBUG] Command status: %d' % status)
         time.sleep(3)
+
     ssh_clt.close()
 
 
@@ -75,42 +78,53 @@ def test_sfc_ct(mode=0):
             print('[TEST] Run tests in mode 0.')
             # Chain start time stamp
             start_ts_file = 'sfc-ts-ctl-%d.csv' % srv_num
-            ccts_lst = list()
+            ctl_ts_lst = list()
             for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
                 print('[DEBUG] Test round: %d' % round_num)
                 time.sleep(3)  # recv some A packets
-                # Start ts of SFC start
-                ccts_lst.append(time.time())
+                srv_chn_start = time.time()
                 srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=None)
+                srv_chn_end = time.time()
                 port_chain = eva_sfc_mgr.create_pc(srv_chain)
-                time.sleep(15 * srv_num)  # recv some B packets
+                port_chn_end = time.time()
+                time.sleep(30 * srv_num)  # recv some B packets
                 # import ipdb
                 # ipdb.set_trace()
                 eva_sfc_mgr.delete_pc(port_chain)
                 eva_sfc_mgr.delete_sc(srv_chain)
                 time.sleep(3)
+                ctl_ts_lst.append((srv_chn_start, srv_chn_end, port_chn_end))
 
+        # TODO(zuo): Remove usage of eva_sfc_mgr
         if mode == 1:
-            # TODO: should test after implementaion of SF manager
-            pass
-            # print('[TEST] Run tests in mode 1.')
-            # srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=15)
-            # for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
-            #     print('[DEBUG] Test round: %d' % round_num)
-            #     time.sleep(10)  # recv some A packets
-            #     # Create the port chain
-            #     port_chain = eva_sfc_mgr.create_pc(srv_chain)
-            #     time.sleep(10)  # recv some B packets
-            #     # Delete the port chain
-            #     eva_sfc_mgr.delete_pc(port_chain)
-            #     time.sleep(3)
-            # time.sleep(3)
-
-            # eva_sfc_mgr.delete_sc(srv_chain)
+            EVA_SERVER = {
+                'image': 'ubuntu-cloud',
+                'flavor': 'sfc_test',
+                'init_script': './init_py_forwarding.sh',
+                'ssh': {
+                    'user_name': 'ubuntu',
+                    'pub_key_name': 'sfc_test',
+                    'pvt_key_file': '/home/zuo/sfc_ostack_test/sfc_test.pem'
+                }
+            }
+            print('[TEST] Run tests in mode 1 with SFC StaicManager.')
+            sfc_mgr = manager.StaticSFCManager(mgr_ip='192.168.100.1')
+            import ipdb
+            ipdb.set_trace()
+            sfc_conf = conf.SFCConf(eva_sfc_mgr.conf_hd.conf_dict)
+            for idx in range(1, srv_num + 1):
+                cur_srv = EVA_SERVER.copy()
+                cur_srv.update(
+                    {'name': 'chn%s' % srv_num, }
+                )
+                sfc_conf.append_srv_grp([cur_srv])
+            sfc = sfc_mgr.create_sfc(sfc_conf)
+            sfc_mgr.delete_sfc(sfc)
 
         with open(start_ts_file, 'w+') as csv_f:
-            for ts in ccts_lst:
-                csv_f.write('%f\n' % ts)
+            for ts_tpl in ctl_ts_lst:
+                csv_f.write(','.join(map(str, ts_tpl)))
+                csv_f.write('\n')
 
         # Kill timer on dst instance
         _ssh_cmd(DST_FIP, 22, SSH_USER, SSH_PKEY, KILL_CTIMER)
@@ -146,6 +160,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         ap.print_help()
         sys.exit()
+
     args = ap.parse_args()
 
     auth_args = {
@@ -193,14 +208,15 @@ if __name__ == "__main__":
             try:
                 subprocess.run(
                     ['python3', '../sfc_mgr.py', SFC_CONF,
-                        INIT_SCRIPT, 'delete', '%d' % srv_num],
+                     INIT_SCRIPT, 'delete', '%d' % srv_num],
                     check=True)
             except Exception:
                 pass
             if args.full_clean:
                 print('[INFO] Run full clean func')
                 _ssh_cmd(DST_FIP, 22, SSH_USER, SSH_PKEY, KILL_CTIMER)
-            sys.exit(0)
+
+        sys.exit(0)
 
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
 

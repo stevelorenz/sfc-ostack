@@ -131,13 +131,15 @@ def run_client(addr):
 
     signal.signal(signal.SIGTERM, exit_client)
 
-    base_payload = b'a' * PAYLOAD_LEN
+    base_payload = 'a' * PAYLOAD_LEN
+    pack_num = 0
     while True:
         # Send time stamp
-        send_ts_b = str(time.time()).encode('ascii')
-        payload = b','.join((base_payload, send_ts_b))
-        logger.debug('Send payload: %s' % payload.decode('ascii'))
-        send_sock.sendto(payload, addr)
+        send_ts = str(time.time())
+        payload = ','.join((base_payload, str(pack_num), send_ts))
+        logger.debug('Send payload: %s' % payload)
+        send_sock.sendto(payload.encode('ascii'), addr)
+        pack_num += 1
         time.sleep(SEND_INTERVAL)
 
 

@@ -3,15 +3,17 @@
 # vim:fenc=utf-8
 
 """
-About: Configuration Holder and Parser
+About: SFC configuration holder
+
 Email: xianglinks@gmail.com
 """
 
 import logging
 
 import yaml
+from addict import Dict as ADict
 
-from sfcostack import log
+from sfcostack import log, utils
 
 logger = log.logger
 
@@ -20,10 +22,13 @@ SUP_FMT = ('yaml', )
 
 
 class ConfigError(Exception):
-    """Config Error"""
+    """Config error"""
     pass
 
 
+# TODO: To be removed
+# ------------------------------------------------------------------------------
+@utils.deprecated
 class ConfigHolder(object):
 
     """Container for configuration parameters"""
@@ -51,11 +56,11 @@ class ConfigHolder(object):
         """Get cloud config"""
         if 'cloud' not in self.conf_dict:
             raise ConfigError('Missing cloud configs!')
-        cloud_conf = self.conf_dict['cloud']
+        _cloud_conf = self.conf_dict['cloud']
         for sec in ('auth', ):
-            if sec not in cloud_conf:
+            if sec not in _cloud_conf:
                 raise ConfigError('Missing %s configs in cloud section!' % sec)
-        return cloud_conf
+        return _cloud_conf
 
     def _get_sfc_conf(self):
         """Get SFC config"""
@@ -105,7 +110,7 @@ class ConfigHolder(object):
             if srv_grp_lst[conf['seq_num'] - 1] != 0:
                 raise ConfigError('Duplicated server sequence number.')
             srv_grp_lst[conf['seq_num'] - 1] = [conf]
-        return srv_grp_lst
+            return srv_grp_lst
 
 
 class ConfigParser(object):
@@ -137,3 +142,160 @@ class ConfigParser(object):
         if self.fmt == 'yaml':
             with open(url, 'r') as stream:
                 yaml.dump(stream)
+
+# ------------------------------------------------------------------------------
+
+
+class SFCConf(object):
+
+    """Ostack-SFC configuration descriptor
+
+    Properties use addict whose values are both gettable and settable using attributes
+    """
+
+    def __init__(self, conf_dict=None):
+        """Init a conf descriptor"""
+
+        self._cloud_conf = None
+        self._sfc_conf = None
+        self._log_conf = None
+
+        # Config properties
+        self._auth = None
+        self._function_chain = None
+        self._flow_classifier = None
+        self._network = None
+        self._server_chain = None
+
+        self._conf_dict = conf_dict
+        if self._conf_dict:
+            self._construct_sfc_conf()
+
+    @staticmethod
+    def _check_arg(sec, conf, arg_lst):
+        error_info = 'Missing {} configs in {} section!'
+        for arg in arg_lst:
+            if arg not in conf:
+                raise ConfigError(error_info.format(arg, sec))
+
+    def _construct_sfc_conf(self):
+        """Construct a addict formatted SFC conf from nested dict"""
+        for sec in ('log', 'cloud', 'SFC'):
+            if sec not in self._conf_dict:
+                raise ConfigError('Missing %s base section!' % sec)
+        self._log_conf = ADict(self._conf_dict['log'])
+        self._cloud_conf = ADict(self._conf_dict['cloud'])
+        self._sfc_conf = ADict(self._conf_dict['SFC'])
+
+        self._set_cloud_auth(self._cloud_conf.auth)
+        self._set_sfc_function_chain(self._sfc_conf.function_chain)
+        self._set_sfc_flow_classifier(self._sfc_conf.flow_classifier)
+        self._set_sfc_network(self._sfc_conf.network)
+        self._set_sfc_server_chain(self._sfc_conf.server_chain)
+
+    def load_file(self, path, fmt='yaml'):
+        """Load SFC configs from file
+
+        :param path (str): Path of config file
+        :param fmt (str): File format, support yaml
+        """
+        if fmt == 'yaml':
+            with open(path, 'r') as conf_file:
+                self._conf_dict = yaml.safe_load(conf_file)
+        else:
+            raise ConfigError('Unknown conf file format!')
+        self._construct_sfc_conf()
+
+    ############################
+    #  Server Chain Operation  #
+    ############################
+
+    # Mainly used for evaluation tests
+    def append_srv_grp(self, srv_grp):
+        """Append a server group at the end of the server chain"""
+        for srv in srv_grp:
+            self._check_arg('SFC, server chain, %s' % srv['name'],
+                            srv,
+                            ('image', 'flavor', 'init_script')
+                            )
+        self._server_chain.append(srv_grp)
+
+    ######################
+    #  Property Setters  #
+    ######################
+
+    def _get_cloud_auth(self):
+        return self._auth
+
+    def _set_cloud_auth(self, auth_conf):
+        self._check_arg('cloud, auth', auth_conf,
+                        ('auth_url', 'project_name', 'project_domain_name',
+                         'username', 'user_domain_name', 'password')
+                        )
+        self._auth = ADict(auth_conf)
+
+    def _get_sfc_funtion_chain(self):
+        return self._function_chain
+
+    def _set_sfc_function_chain(self, chn_conf):
+        self._check_arg('SFC, function_chain', chn_conf,
+                        ('name', 'description')
+                        )
+        self._function_chain = ADict(chn_conf)
+
+    def _get_sfc_flow_classifier(self):
+        return self._flow_classifier
+
+    def _set_sfc_flow_classifier(self, flow_conf):
+        self._check_arg('SFC, flow_classifier', flow_conf,
+                        ('name', 'description', 'ethertype', 'protocol',
+                         'source_port_range_min', 'source_port_range_max',
+                         'destination_port_range_min',
+                         'destination_port_range_max',
+                         'source_ip_prefix',
+                         'destination_ip_prefix',
+                         'logical_source_port',
+                         'logical_destination_port')
+                        )
+        self._flow_classifier = ADict(flow_conf)
+
+    def _get_sfc_network(self):
+        return self._network
+
+    def _set_sfc_network(self, net_conf):
+        self._check_arg('SFC, network', net_conf,
+                        ('net_name', 'subnet_name')
+                        )
+        self._network = ADict(net_conf)
+
+    def _get_sfc_server_chain(self):
+        return self._server_chain
+
+    def _set_sfc_server_chain(self, srv_chn_conf):
+        if not srv_chn_conf:
+            logger.warning('No SF server in server_chain conf!')
+            self._server_chain = []
+            return
+        # MARK: Duplicated sequence number is not allowed
+        # TODO: Add support for server group
+        srv_chn = [0] * len(srv_chn_conf)
+        for srv, conf in srv_chn_conf.items():
+            conf['name'] = srv
+            if srv_chn[conf['seq_num'] - 1] != 0:
+                raise ConfigError('Duplicated server sequence number.')
+            self._check_arg('SFC, server_chain, %s' % srv,
+                            conf,
+                            ('image', 'flavor', 'init_script')
+                            )
+            srv_chn[conf['seq_num'] - 1] = [conf]
+        self._server_chain = srv_chn
+
+    auth = property(fget=_get_cloud_auth, fset=_set_cloud_auth)
+    function_chain = property(fget=_get_sfc_funtion_chain,
+                              fset=_set_sfc_function_chain)
+    flow_classifier = property(fget=_get_sfc_flow_classifier,
+                               fset=_set_sfc_flow_classifier)
+    network = property(fget=_get_sfc_network,
+                       fset=_set_sfc_network)
+    server_chain = property(fget=_get_sfc_server_chain,
+                            fset=_set_sfc_server_chain)

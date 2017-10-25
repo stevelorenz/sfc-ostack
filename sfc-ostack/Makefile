@@ -79,9 +79,9 @@ uninstall-all-pkgs:
 #  Local Dev  #
 ###############
 
-LOCAL_LOC="/opt/stack/dev_project/sfc-ostack-gh"
+LOCAL_LOC="../../sfc-ostack-pub/"
 TEST_SERVER="zuo@192.168.157.81"
-REMOTE_LOC="~/"
+REMOTE_LOC="~/sfc-ostack-pub"
 
 try-upload-test-server:
 	@rsync -n -rav -e ssh --exclude="venv" --exclude=".git" --progress --delete $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
