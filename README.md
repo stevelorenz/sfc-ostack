@@ -4,9 +4,11 @@
 
 ## Catalog ##
 
-- sfc-ostack: SFC-Ostack framework source code and demos.
-- sfcclient: A REST-client for Neutron networking-sfc extension.
-- up_stack: Tools to setup OpenStack on single or multiple nodes.
+- [sfc-ostack](./sfc-ostack/README.md)
+
+- [sfcclient](./sfcclient/README.md)
+
+- [up_stack](./up_stack/README.md)
 
 ## Maintainer ##
 

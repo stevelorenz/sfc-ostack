@@ -1,0 +1,91 @@
+#!/bin/bash
+# About: Restart OpenStack service(s) on controller and compute node
+#        The controller and network node run on the same host
+# Email: xianglinks@gmail.com
+
+restart_cmd="systemctl restart"
+
+function print_help() {
+    echo ""
+    echo "Usage: restart-service node_type service"
+    exit
+}
+
+# TODO: colorful print
+function show_service_status() {
+    systemctl | grep "$1"
+}
+
+# Restart a array of services
+function restart_srv_arr() {
+    arr=("$@")
+    for srv in "${arr[@]}"; do
+        echo "  Restart $srv"
+        $restart_cmd "$srv"
+        sleep 3
+        show_service_status "$srv"
+    done
+}
+
+if [[ "$1" == "controller" ]]; then
+    if [[ "$2" == "heat" ]]; then
+        echo "# Restart HEAT service"
+        declare -a srv_arr=(
+        "heat-api"
+        "heat-api-cfn"
+        "heat-engine"
+        )
+        restart_srv_arr "${srv_arr[@]}"
+    elif [[ "$2" == "nova" ]]; then
+        echo "# Restart Nova service"
+        declare -a srv_arr=(
+        "nova-api"
+        "nova-consoleauth"
+        "nova-scheduler"
+        "nova-conductor"
+        "nova-novncproxy"
+        )
+        restart_srv_arr "${srv_arr[@]}"
+    elif [[ "$2" == "neutron" ]]; then
+        echo "# Restart neutron service"
+        declare -a srv_arr=(
+        "neutron-server"
+        "neutron-dhcp-agent"
+        "neutron-metadata-agent"
+        "neutron-openvswitch-agent"
+        "neutron-ovs-cleanup"
+        "neutron-l3-agent"
+        )
+        restart_srv_arr "${srv_arr[@]}"
+    else
+        echo "[ERROR] Unknown service!"
+        print_help
+        exit
+    fi
+
+elif [[ "$1" == "compute" ]]; then
+    if [[ "$2" == "nova" ]]; then
+        echo "# Restart Nova service"
+        declare -a srv_arr=(
+        "nova-compute"
+        )
+        restart_srv_arr "${srv_arr[@]}"
+    elif [[ "$2" == "neutron" ]]; then
+        echo "# Restart neutron service"
+        declare -a srv_arr=(
+        "neutron-openvswitch-agent"
+        "neutron-ovs-cleanup"
+        )
+        restart_srv_arr "${srv_arr[@]}"
+    fi
+
+elif [[ "$1" == "test" ]]; then
+    echo "[TEST] Run dev tests"
+    x=("nova-apt" "nova-sp")
+    restart_srv_arr "${x[@]}"
+else
+    echo "[ERROR] Unknown node type!"
+    print_help
+    exit
+
+fi

@@ -15,9 +15,7 @@ Programming Language: Python 3.5.2
 
 - test_demo: A test demo for testing networking-sfc and sfc-client module. Details can be found in the README of the demo folder.
 
-#### requirements.txt and dev_requirements.txt
-
-Python package requirements for using and development of sfcclient
+- requirements.txt and dev_requirements.txt: Python package requirements for using and development of sfcclient
 
 ## Usage ##
 

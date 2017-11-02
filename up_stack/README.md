@@ -1,3 +1,4 @@
 # Up Stack #
 
-This directory contains scripts and notes to deploy or setup the OpenStack over single or multiple physical nodes.
+- deploy_stack: Scripts and tools for deploying OpenStack
+- diskimage_builder: Scripts for building Ubuntu cloud image with pre-installed packages

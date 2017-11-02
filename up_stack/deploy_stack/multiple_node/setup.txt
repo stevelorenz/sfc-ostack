@@ -1,0 +1,94 @@
+# About: OpenStack setup for SFC-Ostack in the demo room
+# Email: xianglinks@gmail.com
+
+## OpenStack Network
+
+OpenStack identifies *three* distinct networks:
+
+ |---------|       |------------|  |---------|
+ | Network |       | Controller |  | Compute |
+ |---------|       |------------|  |---------|
+ eth0 eth1 eth2         eth0        eth0  eth1
+   |    |   |             |           |     |
+ |-------------------------------------------------| management network
+        |   |                               |
+ |-------------------------------------------------| external network
+        |                                   |
+ |-------------------------------------------------| internal network(VM data network)
+
+1. Internal network(VM data network, aka int-net)
+
+    Used for traffic between VM instances, only connected to all compute nodes and network node.
+    The network node provides layer 3, DHCP and metadata services for virtual instances.
+
+2. Management network(aka mgr-net)
+
+    Used for OpenStack services and management, connected to all nodes.
+
+3. External network(aka ext-net)
+
+    Only connected to network node and used for accessing external networks e.g. Internet.
+
+[MARK] Because of limited NICs on the host, the mgr-net and ext-net *share* the same network interface.
+       The controlling and networking services are running on the same host called the 'controller' node.
+
+## Neutron Networking
+> Ref : https://docs.openstack.org/neutron/latest/install/overview.html
+
+There are two virtual networking options:
+
+
+
+## Hosts and Network Setup
+
+- Host Machine:
+
+    - Product: HP Prodesk 600
+    - CPU: Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz
+    - RAM: 16GB
+    - DISK: 256GB SSD + 1T HDD
+    - OS: Ubuntu server 16.04.3 LTS
+
+- Host name: comnets-ostack-idx for idx in (0, 1, 2, 3) # from left to right
+
+- NIC: Each host has at least two NICs;
+
+     - NIC on the main board is used for mgr-net and ext-net;
+     - NIC card is used for int-net;
+
+- Network:
+
+            Can be accessed from ComNets chair network: root@192.168.157.165
+            |--------|
+            | Router |  Subnet: 192.168.12.0/24, used for mgr-net and ext-net
+            |--------|
+     | .10        | .11          | .12         | .13
+|---------|  |----------|   |----------|  |----------|
+| Control |  | Compute1 |   | Compute2 |  | Compute3 |
+| Network |  |----------|   |----------|  |----------|
+|---------|
+     | .1         | .XX          | .YY         | .ZZ
+            |--------|
+            | Switch | Subnet: 192.168.13.0/24, used for int-net
+            |--------| [BUG] DHCP and DNS service: run dnsmasq on the controller node
+
+## Installation of OpenStack and Neutron networking-sfc extension
+
+### Ref  :
+
+    1. [openstack-installation-guide](https://docs.openstack.org/neutron/latest/install/index.html#)
+
+### Tool :
+
+    1. [openstack-manual-installation](https://bitbucket.org/comnets/openstack-manual-installation) by Tung Doan
+    2. [crudini](http://www.pixelbeat.org/programs/crudini/): CURD operations for ini file
+
+### Steps :
+
+Step 1: Configure network on controller and compute node
+
+Step 2: Install OpenStack components on controller node
+
+Step 3: Install OpenStack components on compute node
+
+Step 4: Install OpenStack Neutron networking-sfc extension on controller node
