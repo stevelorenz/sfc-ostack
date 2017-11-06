@@ -12,7 +12,6 @@ MARK(Zuo, 12.10.2017):
 Email: xianglinks@gmail.com
 """
 
-import logging
 import time
 from collections import deque
 
@@ -27,10 +26,10 @@ from sfcostack.sfc import netsfc_clt
 
 logger = log.logger
 
+
 ############
 #  Errors  #
 ############
-
 
 class SFCRscError(Exception):
     """Base error of SFC resource"""
@@ -292,6 +291,7 @@ class ServerChain(object):
                     hot_cont.resource_lst.append(
                         hot.Resource(srv['name'] + '_fip', 'fip', prop))
 
+                # MARK: SHOULD be implemented in vsf
                 prop = {
                     'name': srv['name'],
                     'image': srv['image'],
@@ -302,10 +302,15 @@ class ServerChain(object):
                 if srv.get('ssh', None):
                     prop['key_name'] = srv['ssh']['pub_key_name']
 
+                if srv.get('availability_zone', None):
+                    prop['availability_zone'] = srv['availability_zone']
+                    logger.debug('%s, availability zone: %s'
+                                 % (srv['name'], srv['availability_zone']))
+
                 # MARK: Only test RAW bash script
                 if srv.get('init_script', None):
-                    logger.debug('Read the init bash script: %s'
-                                 % srv['init_script'])
+                    logger.debug('%s, read init bash script, path:%s'
+                                 % (srv['name'], srv['init_script']))
                     with open(srv['init_script'], 'r') as init_file:
                         # MARK: | is needed after user_data
                         prop.update(
@@ -322,9 +327,10 @@ class ServerChain(object):
 
         :param wait_complete (Bool): Block until the stack has the status COMPLETE
         """
+        logger.debug(
+            'Create server chain:%s.' % self.name
+        )
         hot_str = self.get_output_hot()
-        logger.info('Create the server chain using HEAT, stack name: %s' %
-                    self.name)
         self.heat_client.stacks.create(stack_name=self.name,
                                        template=hot_str)
         if wait_complete:
@@ -340,14 +346,18 @@ class ServerChain(object):
                     return
                 # Create in process
                 else:
+                    logger.debug(
+                        'Server chain creation is in progress.'
+                    )
                     time.sleep(interval)
                     total_time += interval
             raise SFCRscError(
                 'Creation of server chain:%s timeout!' % self.name)
 
     def delete(self, wait_complete=True, interval=3, timeout=600):
-        logger.info('Delete the server chain using HEAT, stacks name: %s' %
-                    self.name)
+        logger.debug(
+            'Delete server chain:%s' % self.name
+        )
         sc_stack = self.conn.orchestration.find_stack(self.name)
         if not sc_stack:
             raise SFCRscError('Can not find server chain with name: %s' %
@@ -421,7 +431,8 @@ class PortChain(object):
 
     def create(self):
         """Create port chain"""
-        logger.info('Create port pairs and port pair groups.')
+        logger.debug('Create port pairs and port pair groups for %s.'
+                     % self.name)
         srv_ppgrp_lst = self.srv_chain.get_srv_ppgrp_id()
         pp_grp_id_lst = list()
         for grp_idx, pp_grp in enumerate(srv_ppgrp_lst):
@@ -455,7 +466,7 @@ class PortChain(object):
         )
         self.flow_conf['logical_source_port'] = src_pt.id
         self.flow_conf['logical_destination_port'] = dst_pt.id
-        logger.info('Create the flow classifier.')
+        logger.debug('Create the flow classifier.')
         self.pc_client.create('flow_classifier', self.flow_conf)
         fc_id = self.pc_client.get_id(
             'flow_classifier', self.flow_conf['name'])
@@ -466,20 +477,21 @@ class PortChain(object):
             'port_pair_groups': pp_grp_id_lst,
             'flow_classifiers': [fc_id]
         }
-        logger.info('Create the port chain: %s.' % self.name)
+        logger.debug('Create the port chain: %s.' % self.name)
         self.pc_client.create('port_chain', pc_args)
 
     def delete(self):
         """Delete the port chain"""
-        logger.info('Delete the port chain: %s' % self.name)
+        logger.debug('Delete the port chain: %s' % self.name)
         # Delete port chain
         self.pc_client.delete('port_chain', self.name)
 
-        logger.info('Delete the flow classifier.')
+        logger.debug('Delete the flow classifier.')
         self.pc_client.delete('flow_classifier', self.flow_conf['name'])
 
         # Delete all port pair groups
-        logger.info('Delete port pair groups and port pairs.')
+        logger.debug('Delete port pair groups and port pairs for %s'
+                     % self.name)
         srv_ppgrp_lst = self.srv_chain.get_srv_ppgrp_id()
         for grp_idx in range(len(srv_ppgrp_lst)):
             pp_grp_name = 'pp_grp_%s' % grp_idx
@@ -496,6 +508,8 @@ class SFC(object):
 
     """SFC Resource"""
 
-    def __init__(self, srv_chn, port_chn):
+    def __init__(self, name, desc, srv_chn, port_chn):
+        self.name = name
+        self.desc = desc
         self.srv_chn = srv_chn
         self.port_chn = port_chn

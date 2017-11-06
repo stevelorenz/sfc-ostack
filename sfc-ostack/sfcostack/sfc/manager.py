@@ -13,7 +13,7 @@ import socket
 import time
 
 from sfcostack import conf, log
-from sfcostack.sfc import allocator, resource
+from sfcostack.sfc import resource
 
 logger = log.logger
 
@@ -69,56 +69,73 @@ class StaticSFCManager(BaseSFCManager):
     Static means the SFC CAN not be updated
     """
 
-    def __init__(self, mgr_ip, mgr_port=6666,
-                 ssh_access=True
+    def __init__(self, mgr_ip='127.0.0.1', mgr_port=6666,
+                 ssh_access=True, log_creation_ts=False
                  ):
         """Init a StaticSFCManager
 
         :param mgr_ip (str): IP address for SF management
         :param mgr_port (int): Port for SF management
+        :param log_creation_ts (Bool): If True, time stamps for creation of SFC
+        are returned by create_sfc function.
         """
         logger.debug('Init StaticSFCManager on %s:%s' % (mgr_ip, mgr_port))
         self.mgr_ip = mgr_ip
         self.mgr_port = mgr_port
         self.ssh_access = ssh_access
+        self.log_creation_ts = log_creation_ts
 
         self.sfc_que = list()
-        # TODO: Get mapping from sfc.allocator
-        self.allocator = None
-        self.region_mapping = dict()
 
-    def create_sfc(self, sfc_conf, wait_sf=True):
+    def create_sfc(self, sfc_conf, wait_complete=False, wait_sf=True):
+        sfc_name = sfc_conf.function_chain.name
+        sfc_desc = sfc_conf.function_chain.description
+        logger.info('Create SFC:%s, description:%s' % (sfc_name, sfc_desc))
         srv_chn = resource.ServerChain(
             sfc_conf.auth,
-            sfc_conf.function_chain.name,
-            sfc_conf.function_chain.description,
+            sfc_name + '_srv_chn',
+            sfc_desc,
             sfc_conf.network,
             sfc_conf.server_chain,
             self.ssh_access, 'pt'
         )
-        srv_num = srv_chn.get_srv_num()
-        # MARK: Do
-        srv_chn.create(wait_complete=False)
+        srv_chn_start = time.time()
+        logger.info(
+            'Create server chain, wait_complete=%s.' % wait_complete)
+        srv_chn.create(wait_complete=wait_complete)
 
         if wait_sf:
-            logger.info('[StaticSFCManager] Wait all SF(s) to be ready.')
+            logger.info('Wait all SF(s) to be ready via socket.')
             self._wait_sf(srv_chn)
+        srv_chn_end = time.time()
 
         port_chn = resource.PortChain(
             sfc_conf.auth,
-            sfc_conf.function_chain.name,
-            sfc_conf.function_chain.description,
+            sfc_name + '_port_chn',
+            sfc_desc,
             srv_chn,
             sfc_conf.flow_classifier
         )
+        port_chn_start = time.time()
+        logger.info('Create port chain.')
         port_chn.create()
+        port_chn_end = time.time()
 
-        return resource.SFC(srv_chn, port_chn)
+        if self.log_creation_ts:
+            return (
+                resource.SFC(sfc_name, sfc_desc, srv_chn, port_chn),
+                (srv_chn_start, srv_chn_end, port_chn_start, port_chn_end)
+            )
+
+        else:
+            return resource.SFC(sfc_name, sfc_desc, srv_chn, port_chn)
 
     def delete_sfc(self, sfc):
+        logger.info(
+            'Delete SFC:%s, description:%s' % (sfc.name, sfc.desc)
+        )
         sfc.port_chn.delete()
-        srv_num = sfc.srv_chn.get_srv_num()
-        sfc.srv_chn.delete(600 * srv_num)
+        sfc.srv_chn.delete()
 
     def update_sfc(self, **args):
         raise RuntimeError(
@@ -134,9 +151,8 @@ class StaticSFCManager(BaseSFCManager):
         # for grp_fips in srv_fips:
         # check_ips.extend(grp_fips)
 
-        srv_num = srv_chn.get_srv_num()
-        logger.debug('[StaticSFCManager] Wait %d SF server to be ready.' %
-                     srv_num)
+        check_num = srv_chn.get_srv_num()
+        logger.debug('Total number of SF servers: %d' % check_num)
 
         recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         recv_sock.bind((self.mgr_ip, self.mgr_port))
@@ -144,16 +160,13 @@ class StaticSFCManager(BaseSFCManager):
 
         # MARK: Timeout MAY be used here
         while True:
-            if srv_num == 0:
-                # if len(check_ips) == 0:
+            if check_num == 0:
                 break
             _, addr = recv_sock.recvfrom(1024)
-            # check_ips.remove(addr[0])
-            srv_num -= 1
+            check_num -= 1
             debug_info = (
-                '[StaticSFCManager] Recv a ready-packet from %s, %d SF(s)to be ready'
-                # % (addr[0], len(check_ips))
-                % (addr[0], srv_num)
+                '[StaticSFCManager] Recv ready - packet from %s, %d SF(s)to be ready'
+                % (addr[0], check_num)
             )
             logger.debug(debug_info)
             # time.sleep(interval)

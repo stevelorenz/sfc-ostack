@@ -14,16 +14,24 @@ logger = logging.getLogger('sfc-ostack')
 
 LEVELS = {
     'debug': logging.DEBUG,
+    'DEBUG': logging.DEBUG,
     'info': logging.INFO,
+    'INFO': logging.INFO,
     'warning': logging.WARNING,
+    'WARNING': logging.WARNING,
     'error': logging.ERROR,
-    'critical': logging.CRITICAL
+    'ERROR': logging.ERROR,
+    'critical': logging.CRITICAL,
+    'CRITICAL': logging.CRITICAL
 }
 
 FORMAT = {
     'default': '%(asctime)s %(message)s',
+    'DEFAULT': '%(asctime)s %(message)s',
     'debug': '%(asctime)s %(levelname)-8s %(module)s %(lineno)d %(message)s',
-    'info': '%(asctime)s %(message)s'
+    'DEBUG': '%(asctime)s %(levelname)-8s %(module)s %(lineno)d %(message)s',
+    'info': '%(asctime)s %(levelname)-8s %(module)s %(message)s',
+    'INFO': '%(asctime)s %(levelname)-8s %(module)s %(message)s'
 }
 
 

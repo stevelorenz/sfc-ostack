@@ -1,3 +1,3 @@
 # Demo #
 
-- add_timestamp: Add recv and send time stamp on UDP packets
+- test_func: Test basic functionalities of SFC

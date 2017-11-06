@@ -224,6 +224,12 @@ class SFCConf(object):
     #  Property Setters  #
     ######################
 
+    def _get_log(self):
+        return self._log_conf
+
+    def _set_log(self, log_conf):
+        self._log_conf = ADict(log_conf)
+
     def _get_cloud_auth(self):
         return self._auth
 
@@ -290,6 +296,7 @@ class SFCConf(object):
             srv_chn[conf['seq_num'] - 1] = [conf]
         self._server_chain = srv_chn
 
+    log = property(fget=_get_log, fset=_set_log)
     auth = property(fget=_get_cloud_auth, fset=_set_cloud_auth)
     function_chain = property(fget=_get_sfc_funtion_chain,
                               fset=_set_sfc_function_chain)
