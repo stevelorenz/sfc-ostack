@@ -1,5 +1,5 @@
 #!/bin/bash
-# About: Init script for a SF
+# About: Init script for python forwarding
 # Email: xianglinks@gmail.com
 
 # Setup ingress and egress interface
@@ -7,8 +7,8 @@ ip link set eth1 up
 ip link set eth2 up
 
 # Source and destination instance IP
-SRC_IP=10.0.0.3
-DST_IP=10.0.0.10
+SRC_IP=10.0.0.1
+DST_IP=10.0.0.2
 
 # SF program SHOULD read and send chained packets from BRIDGE_IP
 BRIDGE_IP=192.168.0.1

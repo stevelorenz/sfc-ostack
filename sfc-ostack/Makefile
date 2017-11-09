@@ -35,9 +35,17 @@ errcheck-all:
 	@echo "Check errors for all python src with pylint..."
 	@pylint -E --rcfile=.pylint $(PYSRC_ALL)
 
+stats-all:
+	@echo "Stats for all python src with cloc"
+	@cloc $(PYSRC_ALL)
+
 errcheck-sfcostack:
 	@echo "Check errors for sfc-ostack src with pylint..."
 	@pylint -E --rcfile=.pylint $(PYSRC_SFC_OSTACK)
+
+stats-sfcostack:
+	@echo "Stats for sfc-ostack src with cloc"
+	@cloc $(PYSRC_SFC_OSTACK)
 
 test:
 	@echo "Run unit tests for sfc-ostack with pytest..."

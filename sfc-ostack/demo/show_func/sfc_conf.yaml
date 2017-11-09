@@ -35,19 +35,16 @@ SFC:
     logical_destination_port: dst_pt
 
   network:
+    pubnet_name:
     net_name:
     subnet_name:
 
-  server_chain:
-
-    sample:
-      seq_num: 1
-      image: ubuntu-trusty
-      flavor: ubuntu-trusty.tiny
-      init_script: ./init_sf.sh
-      ssh:
-        user_name: ubuntu
-        pub_key_name: sfc
-        pvt_key_file: /opt/openstack/keypair/sfc.pem
-
+  sample_server:
+    image: ubuntu-cloud
+    flavor: m.test
+    init_script: ./init_sf.sh
+    ssh:
+      user_name: ubuntu
+      pub_key_name: test
+      pvt_key_file: ./test.pem
 ...

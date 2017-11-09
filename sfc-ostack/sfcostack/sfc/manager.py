@@ -9,18 +9,18 @@ Email: xianglinks@gmail.com
 """
 
 import logging
+import random
 import socket
 import time
+from functools import partial
+
+from openstack import connection
 
 from sfcostack import conf, log
+from sfcostack.dev import helper
 from sfcostack.sfc import resource
 
 logger = log.logger
-
-
-class SFCManagerError(Exception):
-    """SFC manager error"""
-    pass
 
 
 def get_sfc_manager(typ):
@@ -34,6 +34,19 @@ def get_sfc_manager(typ):
     else:
         raise SFCManagerError('Unknown SFC manager type!')
 
+
+###########
+#  Error  #
+###########
+
+class SFCManagerError(Exception):
+    """SFC manager error"""
+    pass
+
+
+#############
+#  Manager  #
+#############
 
 class BaseSFCManager(object):
 
@@ -69,13 +82,15 @@ class StaticSFCManager(BaseSFCManager):
     Static means the SFC CAN not be updated
     """
 
-    def __init__(self, mgr_ip='127.0.0.1', mgr_port=6666,
+    def __init__(self, auth_args,
+                 mgr_ip='127.0.0.1', mgr_port=6666,
                  ssh_access=True, log_creation_ts=False
                  ):
         """Init a StaticSFCManager
 
         :param mgr_ip (str): IP address for SF management
         :param mgr_port (int): Port for SF management
+        :param auth_args (dict)
         :param log_creation_ts (Bool): If True, time stamps for creation of SFC
         are returned by create_sfc function.
         """
@@ -85,12 +100,115 @@ class StaticSFCManager(BaseSFCManager):
         self.ssh_access = ssh_access
         self.log_creation_ts = log_creation_ts
 
-        self.sfc_que = list()
+        self.conn = connection.Connection(**auth_args)
 
-    def create_sfc(self, sfc_conf, wait_complete=False, wait_sf=True):
+        self.hyper_name_lst = [hyper.name for hyper in
+                               self.conn.compute.hypervisors()]
+
+        # MARK: CAN be set in the nova.conf in compute node
+        self.cpu_allocate_ratio = 1
+
+    # --- Bad coded functions only used for demo tests and basic algorithms ---
+    # Problem:
+    #   - Mix usage of pythonsdk and client lib
+    #   - Assume all SF instances can be reordered
+    # MUST be reimplemented by Zuo
+    # -------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------
+    def _calc_hyperable_num(self, hyper_name, flavor_name):
+        """Calculate the number of allocatable instance on a hypervisor"""
+        # MARK: Assume single hypervisor on single host
+        hyper_id = self.conn.compute.find_hypervisor(hyper_name).id
+        hyper = self.conn.compute.get_hypervisor(hyper_id)
+        flavor_id = self.conn.compute.find_flavor(flavor_name).id
+        flavor = self.conn.compute.get_flavor(flavor_id)
+        num_cpu = int(
+            self.cpu_allocate_ratio *
+            (hyper.vcpus - hyper.vcpus_used) / flavor.vcpus
+        )
+        num_ram = int(hyper.memory_free / flavor.ram)
+        num_disk = int(hyper.disk_available / flavor.disk)
+        logger.debug('Hyper:%s, flavor:%s, cpu:%d, ram:%d, disk:%d'
+                     % (hyper.name, flavor.name, num_cpu, num_ram, num_disk))
+
+        return min(num_cpu, num_ram, num_disk)
+
+    def _alloc_srv_chn(self, srv_chn, method, dst_hyper_name):
+        """MARK: Bad hard-coded only used for tests"""
+        if method == 'nova_scheduler':
+            for srv_grp in srv_chn:
+                for srv in srv_grp:
+                    # Nova can do everything...
+                    srv['availability_zone'] = 'nova'
+
+        elif method == 'fill_dst':
+            sf_num = len(srv_chn)
+            flavor_name = srv_chn[0][0]['flavor']
+            # Assume other host are equal
+            hyper_lst = self.hyper_name_lst.copy()
+            hyper_lst.remove(dst_hyper_name)
+            hyper_lst.insert(0, dst_hyper_name)
+            hyper_ins_num = [self._calc_hyperable_num(hyper_name, flavor_name)
+                             for hyper_name in hyper_lst]
+            debug_str = 'hyper list: ' + ','.join(hyper_lst)
+            debug_str += ', hyper_ins_num: ' + ','.join(map(str, hyper_ins_num))
+
+            if sum(hyper_ins_num) < sf_num:
+                raise SFCManagerError(
+                    'Insufficient resource for allocation of SF servers')
+            allocated = 0
+            for ins_num, hyper_name in zip(hyper_ins_num, hyper_lst):
+                for idx in range(allocated, allocated + ins_num):
+                    for srv in srv_chn[idx]:
+                        srv['availability_zone'] = 'nova:%s' % hyper_name
+                    allocated += 1
+                    logger.debug('Allocate %s to %s, already allocated:%d'
+                                 % (srv['name'], hyper_name, allocated))
+                    if allocated == sf_num:
+                        return
+
+        else:
+            raise SFCManagerError(
+                'Unknown method for availability zone and host allocation!')
+
+    def _chain_srv_chn(self, srv_chn, method):
+        """
+        MARK: Assume all SF servers CAN be reordered, only for tests
+        """
+        return 0
+    # -------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------
+
+    def create_sfc(self, sfc_conf,
+                   alloc_method, chain_method, dst_hyper_name,
+                   wait_complete=False, wait_sf=True):
+        """Create a SFC
+
+        :param sfc_conf:
+        :param method(str):
+        :param wait_complete (Bool):
+        :param wait_sf (Bool):
+        """
+
+        if wait_complete and wait_sf:
+            raise SFCManagerError(
+                'Flag wait_complete conflicts with wait_sf in current implementation.')
+
+        if alloc_method not in ('nova_scheduler', 'fill_dst'):
+            raise SFCManagerError('Unknown allocation method for SF servers.')
+
+        if chain_method not in ('default', 'min_lat'):
+            raise SFCManagerError('Unknown chaining method for SF servers')
+
         sfc_name = sfc_conf.function_chain.name
         sfc_desc = sfc_conf.function_chain.description
-        logger.info('Create SFC:%s, description:%s' % (sfc_name, sfc_desc))
+        logger.info(
+            'Create SFC:%s, description:%s. Allocation method:%s, chaining method:%s'
+            % (sfc_name, sfc_desc, alloc_method, chain_method))
+
+        self._alloc_srv_chn(sfc_conf.server_chain,
+                            alloc_method, dst_hyper_name)
+
         srv_chn = resource.ServerChain(
             sfc_conf.auth,
             sfc_name + '_srv_chn',

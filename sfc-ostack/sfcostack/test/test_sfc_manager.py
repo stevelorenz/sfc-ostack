@@ -7,12 +7,16 @@ About: Unit test for sfc-ostack.sfc.manager
 """
 
 import os
+import unittest.mock
 
 from context import sfc
 from sfc import manager
 
 
-class TestSFCManager(object):
+class TestStaticSFCManager(object):
 
-    def test_base_manager(self):
-        base_mgr = manager.BaseSFCManager()
+    def test_alloc_srv_chn(self):
+        pass
+
+    def test_chain_srv_chn(self):
+        pass

@@ -506,7 +506,7 @@ class PortChain(object):
 
 class SFC(object):
 
-    """SFC Resource"""
+    """Service Function Chain"""
 
     def __init__(self, name, desc, srv_chn, port_chn):
         self.name = name

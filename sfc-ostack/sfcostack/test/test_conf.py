@@ -17,3 +17,10 @@ conf_sample_path = os.path.join(
 
 sfc_conf = conf.SFCConf()
 sfc_conf.load_file(conf_sample_path)
+
+
+def test_conf():
+    sample_server = sfc_conf.sample_server
+    assert sample_server['image'] == 'ubuntu-cloud'
+    assert sample_server['flavor'] == 'm.test'
+    assert sample_server['init_script'] == './init_sf.sh'

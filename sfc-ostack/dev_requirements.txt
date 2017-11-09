@@ -61,6 +61,8 @@ pyperclip==1.5.27
 pytest==3.2.3
 python-heatclient==1.11.0
 python-keystoneclient==3.13.0
+python-neutronclient==6.5.0
+python-novaclient==9.1.1
 python-openstacksdk==0.5.2
 python-swiftclient==3.4.0
 pytz==2017.2

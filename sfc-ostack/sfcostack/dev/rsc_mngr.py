@@ -17,14 +17,15 @@ import json
 import logging
 import os
 import sys
-# MARK: For tests in the ifmain section
-sys.path.insert(0, '../')
 import time
 from collections import deque
 
 from openstack import connection
 
 from sfcostack import sfcclient
+
+# MARK: For tests in the ifmain section
+sys.path.insert(0, '../')
 
 
 PICKLE_PATH = os.path.join(
@@ -65,6 +66,7 @@ class RscMgr(object):
         self.safe_mode = safe_mode
         # Resource stack
         self.rsc_stack = deque()
+        self.auth_args = auth_args
         # Cloud connection
         self.conn = connection.Connection(**auth_args)
 

@@ -36,6 +36,8 @@ SFC:
   function_chain:
     name: udp_forwarding_dst_9999
     description: A simple forwarding chain for flows with destination UDP port 9999
+    # Hostname of the destination hypervisor
+    destination_hypervisor: comnets-ostack-1
 
   # Flow classifier rules
   # Rules for flow(s) that will be routed into the SFC
@@ -59,16 +61,16 @@ SFC:
   # Neutron network for SF(Service Function) servers
   # All SF servers are launched on the same neutron subnet
   network:
+    pubnet_name: public
     net_name: net1
     subnet_name: subnet1
-    # MARK: To be supported in networking-sfc extension
-    # This security group SHOULD be added into all created neutron ports for FC servers
-    # security_group_name: test
+    # MARK: Security group is not supported in networking-sfc extension
 
-  # Service chain configs
+  # Server chain defines a ordered list of SF servers
+  # Used for static SFC creation
   server_chain:
     # Name of the SF server
-    chn1:
+    sf1:
       # Sequence number(position) in the server chain
       seq_num: 1
       image: ubuntu-cloud
@@ -84,7 +86,7 @@ SFC:
         # Path of private key file(pem file)
         pvt_key_file: ./test.pem
 
-    chn2:
+    sf2:
       seq_num: 2
       image: ubuntu-cloud
       flavor: m.test
@@ -93,5 +95,15 @@ SFC:
         user_name: ubuntu
         pub_key_name: test
         pvt_key_file: ./test.pem
+
+  # Used for dev tests
+  sample_server:
+    image: ubuntu-cloud
+    flavor: m.test
+    init_script: ./init_sf.sh
+    ssh:
+      user_name: ubuntu
+      pub_key_name: test
+      pvt_key_file: ./test.pem
 
 ...
