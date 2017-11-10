@@ -17,6 +17,9 @@ import time
 import paramiko
 from openstack import connection
 
+from sfcostack import conf
+from sfcostack.sfc import manager
+
 # Addr of the UDP echo-server
 SERVER_ADDR = '192.168.100.200:9999'
 # UDP client parameters
@@ -121,18 +124,28 @@ def py_forwarding_test():
 def lk_forwarding_test():
     """Test linux kernel forwarding"""
     print('[TEST] Test UDP RTT with kernel forwarding.')
+    sfc_conf = conf.SFCConf()
+    sfc_conf.load_file(SFC_CONF)
+    sfc_mgr = manager.StaticSFCManager(sfc_conf.auth)
+    sample_ins = sfc_conf.sample_server.copy()
+
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
         print('[TEST] Create %d SF servers' % srv_num)
-        subprocess.run(
-            ['python3', '../sfc_mgr.py', SFC_CONF,
-                INIT_SCRIPT, 'create', '%d' % srv_num],
-            check=True)
-        time.sleep(5)
+        sfc_conf.server_chain = []
+        for idx in range(srv_num):
+            sample_ins['name'] = 'sf%d' % idx
+            sfc_conf.server_chain.append([sample_ins.copy()])
+
+        sfc = sfc_mgr.create_sfc(sfc_conf, 'fill_dst', 'default',
+                                 sfc_conf.function_chain.destination_hypervisor,
+                                 wait_complete=True, wait_sf=False)
+
         # Run UDP client
-        time.sleep(5)
+        time.sleep(10 * srv_num)
         print('[TEST] Run UDP client')
         OUTPUT_FILE_NAME = "./lkf-%s-%s-%s-%s.csv" % (
             NUM_PACKETS, SEND_RATE, PAYLOAD_LEN, srv_num)
+
         subprocess.run(['python3', './udp_latency.py', '-c', SERVER_ADDR,
                         '--n_packets', NUM_PACKETS,
                         '--payload_len', PAYLOAD_LEN,
@@ -140,11 +153,9 @@ def lk_forwarding_test():
                         '--output_file', OUTPUT_FILE_NAME
                         ],
                        check=True)
-        time.sleep(5)
-        subprocess.run(
-            ['python3', '../sfc_mgr.py', SFC_CONF,
-                INIT_SCRIPT, 'delete', '%d' % srv_num],
-            check=True)
+
+        time.sleep(10 * srv_num)
+        sfc_mgr.delete_sfc(sfc)
 
 
 if __name__ == "__main__":

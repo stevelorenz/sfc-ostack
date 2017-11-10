@@ -64,6 +64,9 @@ of the ServerChain takes much time, which SHOULD be avoided if the SFs on the
 server remain unchanged.
 """
 
+# TODO: Add get and set methods for server groups instead of playing with nested
+# lists
+
 
 class ServerChain(object):
 
@@ -218,7 +221,6 @@ class ServerChain(object):
     def _get_hot_network(self):
         pass
 
-    # MARK: Add region mapping here
     def _get_hot_instance(self):
         pass
 

@@ -171,11 +171,48 @@ class StaticSFCManager(BaseSFCManager):
             raise SFCManagerError(
                 'Unknown method for availability zone and host allocation!')
 
-    def _chain_srv_chn(self, srv_chn, method):
+    def _get_srv_chn_alloc(self, srv_chn, avail_hypers):
+        """Get allocation of server chain on hypervisors
+
+        :return alloc_map (dict):
+        """
+        alloc_map = {hyper: list() for hyper in avail_hypers}
+        for srv_grp in srv_chn:
+            for srv in srv_grp:
+
+                while True:
+                    srv_tmp = self.conn.compute.find_server(srv['name'])
+                    if srv_tmp:
+                        break
+                    else:
+                        logger.debug('Server:%s can not be found in the db' %
+                                     srv['name'])
+                        time.sleep(1)
+
+                srv_obj = self.conn.compute.get_server(srv_tmp)
+                alloc_map[srv_obj.hypervisor_hostname].append(srv)
+        return alloc_map
+
+    def _reorder_srv_chn(self, method, srv_chn, avail_hypers):
         """
         MARK: Assume all SF servers CAN be reordered, only for tests
         """
-        return 0
+        new_srv_chn = list()
+
+        if method == 'default':
+            new_srv_chn = srv_chn.copy()
+            return new_srv_chn
+
+        elif method == 'min_lat':
+            logger.info('Reorder the chain for minimal latency')
+            alloc_map = self._get_srv_chn_alloc(srv_chn, avail_hypers)
+            for hyper, srvs in alloc_map.items():
+                new_srv_chn.extend(srvs)
+            return new_srv_chn
+        else:
+            raise SFCManagerError(
+                'Unknown reordering method for server chain'
+            )
     # -------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------
 
@@ -226,6 +263,21 @@ class StaticSFCManager(BaseSFCManager):
             logger.info('Wait all SF(s) to be ready via socket.')
             self._wait_sf(srv_chn)
         srv_chn_end = time.time()
+
+        new_srv_chn = self._reorder_srv_chn(
+            chain_method,
+            sfc_conf.server_chain,
+            sfc_conf.function_chain.available_hypervisors
+        )
+
+        srv_chn = resource.ServerChain(
+            sfc_conf.auth,
+            sfc_name + '_srv_chn',
+            sfc_desc,
+            sfc_conf.network,
+            new_srv_chn,
+            self.ssh_access, 'pt'
+        )
 
         port_chn = resource.PortChain(
             sfc_conf.auth,

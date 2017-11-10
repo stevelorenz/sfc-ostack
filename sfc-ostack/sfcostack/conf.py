@@ -243,7 +243,8 @@ class SFCConf(object):
 
     def _set_sfc_function_chain(self, chn_conf):
         self._check_sec_arg('SFC, function_chain', chn_conf,
-                            ('name', 'description', 'destination_hypervisor')
+                            ('name', 'description', 'destination_hypervisor',
+                             'availability_zone', 'available_hypervisors')
                             )
         self._function_chain = ADict(chn_conf)
 

@@ -18,6 +18,7 @@
 log:
   level: INFO
 
+
 # Cloud configs
 cloud:
   # Authentication parameters
@@ -30,14 +31,29 @@ cloud:
     user_domain_name: default
     password: stack
 
+
 # SFC(Service Function Chaining) configs
 SFC:
   # Chain parameters
   function_chain:
     name: udp_forwarding_dst_9999
     description: A simple forwarding chain for flows with destination UDP port 9999
-    # Hostname of the destination hypervisor
+    availability_zone: nova
+    # A list of avaiable hypervisors for allocating SFC
+    available_hypervisors:
+      - comnets-ostack-1
+      - comnets-ostack-2
+      - comnets-ostack-3
+    # Hostname of the hypervisor on which the chain destination is allocated
     destination_hypervisor: comnets-ostack-1
+
+  # Neutron network for SF(Service Function) servers
+  # All SF servers are launched on the same neutron subnet
+  network:
+    pubnet_name: public
+    net_name: net1
+    subnet_name: subnet1
+    # MARK: Security group is not supported in networking-sfc extension
 
   # Flow classifier rules
   # Rules for flow(s) that will be routed into the SFC
@@ -57,14 +73,6 @@ SFC:
     # Name of the source and destination neutron port
     logical_source_port: src_pt
     logical_destination_port: dst_pt
-
-  # Neutron network for SF(Service Function) servers
-  # All SF servers are launched on the same neutron subnet
-  network:
-    pubnet_name: public
-    net_name: net1
-    subnet_name: subnet1
-    # MARK: Security group is not supported in networking-sfc extension
 
   # Server chain defines a ordered list of SF servers
   # Used for static SFC creation

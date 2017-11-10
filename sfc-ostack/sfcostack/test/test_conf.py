@@ -15,11 +15,18 @@ conf_sample_path = os.path.join(
     '../../share/sfcostack_tpl_sample.yaml'
 )
 
-sfc_conf = conf.SFCConf()
-sfc_conf.load_file(conf_sample_path)
 
+def test_SFCConf():
+    """Test SFC conf descriptor"""
+    sfc_conf = conf.SFCConf()
+    sfc_conf.load_file(conf_sample_path)
 
-def test_conf():
+    function_chain = sfc_conf.function_chain
+    function_chain.availability_zone == 'nova'
+    avail_hypers = function_chain.available_hypervisors
+    assert avail_hypers == ['comnets-ostack-1', 'comnets-ostack-2',
+                            'comnets-ostack-3']
+
     sample_server = sfc_conf.sample_server
     assert sample_server['image'] == 'ubuntu-cloud'
     assert sample_server['flavor'] == 'm.test'
