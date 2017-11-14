@@ -151,7 +151,8 @@ class StaticSFCManager(BaseSFCManager):
             hyper_ins_num = [self._calc_hyperable_num(hyper_name, flavor_name)
                              for hyper_name in hyper_lst]
             debug_str = 'hyper list: ' + ','.join(hyper_lst)
-            debug_str += ', hyper_ins_num: ' + ','.join(map(str, hyper_ins_num))
+            debug_str += ', hyper_ins_num: ' + \
+                ','.join(map(str, hyper_ins_num))
 
             if sum(hyper_ins_num) < sf_num:
                 raise SFCManagerError(

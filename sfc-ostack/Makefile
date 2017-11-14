@@ -83,19 +83,4 @@ uninstall-all-pkgs:
 	@echo "Uninstall all pip packages..."
 	pip freeze | xargs pip uninstall -y
 
-###############
-#  Local Dev  #
-###############
-
-LOCAL_LOC="../../sfc-ostack-pub/"
-TEST_SERVER="zuo@192.168.157.81"
-REMOTE_LOC="~/sfc-ostack-pub"
-
-try-upload-test-server:
-	@rsync -n -rav -e ssh --exclude="venv" --exclude=".git" --progress --delete $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
-
-upload-test-server:
-	@echo "Upload $(LOCAL_LOC) to remote test server, $(TEST_SERVER):$(REMOTE_LOC)"
-	@rsync -rav -e ssh --exclude="venv" --exclude=".git" --progress --delete $(LOCAL_LOC) $(TEST_SERVER):$(REMOTE_LOC)
-
 # vim:ft=make
