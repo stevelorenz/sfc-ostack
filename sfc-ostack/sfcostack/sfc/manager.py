@@ -141,7 +141,7 @@ class StaticSFCManager(BaseSFCManager):
                     # Nova can do everything...
                     srv['availability_zone'] = 'nova'
 
-        elif method == 'fill_dst':
+        elif method == 'fill_nearst':
             sf_num = len(srv_chn)
             flavor_name = srv_chn[0][0]['flavor']
             # Assume other host are equal
@@ -217,6 +217,33 @@ class StaticSFCManager(BaseSFCManager):
     # -------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------
 
+    def _wait_sf(self, srv_chn, interval=3):
+        """Wait for SF program to be ready"""
+        # srv_fips = srv_chn.get_srv_fips()
+        # check_ips = list()
+        # for grp_fips in srv_fips:
+        # check_ips.extend(grp_fips)
+
+        check_num = srv_chn.get_srv_num()
+        logger.debug('Total number of SF servers: %d' % check_num)
+
+        recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        recv_sock.bind((self.mgr_ip, self.mgr_port))
+        recv_sock.settimeout(None)
+
+        # MARK: Timeout MAY be used here
+        while True:
+            if check_num == 0:
+                break
+            _, addr = recv_sock.recvfrom(1024)
+            check_num -= 1
+            debug_info = (
+                '[StaticSFCManager] Recv ready - packet from %s, %d SF(s)to be ready'
+                % (addr[0], check_num)
+            )
+            logger.debug(debug_info)
+            # time.sleep(interval)
+
     def create_sfc(self, sfc_conf,
                    alloc_method, chain_method, dst_hyper_name,
                    wait_complete=False, wait_sf=True):
@@ -232,7 +259,7 @@ class StaticSFCManager(BaseSFCManager):
             raise SFCManagerError(
                 'Flag wait_complete conflicts with wait_sf in current implementation.')
 
-        if alloc_method not in ('nova_scheduler', 'fill_dst'):
+        if alloc_method not in ('nova_scheduler', 'fill_nearst'):
             raise SFCManagerError('Unknown allocation method for SF servers.')
 
         if chain_method not in ('default', 'min_lat'):
@@ -312,35 +339,15 @@ class StaticSFCManager(BaseSFCManager):
         raise RuntimeError(
             "Static SFC manager doesn't support update operation.")
 
+    def get_hyper_alloc(self, sfc):
+        """Get allocation mapping for SF server and hypervisor
+
+        :param sfc (sfc.resources.SFC):
+        """
+        pass
+
     def cleanup(self, sfc):
         self.delete_sfc(sfc)
-
-    def _wait_sf(self, srv_chn, interval=3):
-        """Wait for SF program to be ready"""
-        # srv_fips = srv_chn.get_srv_fips()
-        # check_ips = list()
-        # for grp_fips in srv_fips:
-        # check_ips.extend(grp_fips)
-
-        check_num = srv_chn.get_srv_num()
-        logger.debug('Total number of SF servers: %d' % check_num)
-
-        recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        recv_sock.bind((self.mgr_ip, self.mgr_port))
-        recv_sock.settimeout(None)
-
-        # MARK: Timeout MAY be used here
-        while True:
-            if check_num == 0:
-                break
-            _, addr = recv_sock.recvfrom(1024)
-            check_num -= 1
-            debug_info = (
-                '[StaticSFCManager] Recv ready - packet from %s, %d SF(s)to be ready'
-                % (addr[0], check_num)
-            )
-            logger.debug(debug_info)
-            # time.sleep(interval)
 
 
 class DynamicSFCManager(BaseSFCManager):

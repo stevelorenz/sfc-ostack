@@ -51,6 +51,11 @@ class SFCError(SFCRscError):
     pass
 
 
+class SFCDesp(object):
+    """SFC Descriptor"""
+    pass
+
+
 ###################
 #  SFC Resources  #
 ###################

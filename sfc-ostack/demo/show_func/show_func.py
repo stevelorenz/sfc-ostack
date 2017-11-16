@@ -64,4 +64,20 @@ if __name__ == "__main__":
                              sfc_conf.function_chain.destination_hypervisor,
                              wait_complete=True, wait_sf=False)
     ipdb.set_trace()
+
+    # Store hypervisor allocation in a csv file
+    srv_alloc = sfc_mgr._get_srv_chn_alloc(sfc.srv_chn,
+                                           sfc_conf.function_chain.available_hypervisors)
+
+    out_file = '-'.join((args.alloc_method, str(args.number))) + '.csv'
+    with open(out_file, 'w+') as out_stream:
+        for hyper, srv_lst in srv_alloc.items():
+            line = hyper
+            for srv in srv_lst:
+                line += ',%s' % srv
+            line += '\n'
+            out_stream.write()
+
+    ipdb.set_trace()
+
     sfc_mgr.delete_sfc(sfc)

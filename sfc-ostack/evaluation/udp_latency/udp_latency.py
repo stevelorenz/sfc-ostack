@@ -107,7 +107,7 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
 
         tx_time_sec = tx_end_stmp - tx_start_stmp
         sleep_time_sec = packet_interval - tx_time_sec
-        logger.debug('Send packet_n: %d, Sleep time %.3f' %
+        logger.debug('Send packet_n: %d, Sleep time %.6f' %
                      (packet_n, sleep_time_sec))
         if sleep_time_sec > 0:
             time.sleep(sleep_time_sec)
