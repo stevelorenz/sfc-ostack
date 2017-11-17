@@ -23,8 +23,6 @@ level = {
 }
 logger = logging.getLogger(__name__)
 
-SERVER_BUFFER_SIZE = 1024
-
 
 ################################################################################
 #                                 Client Func                                  #
@@ -88,6 +86,7 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
     packet_interval = 1.0 / packet_rate
     logger.debug('Packet interval %.5f', packet_interval)
 
+    # MARK: Use blocking socket
     sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock_out.connect((ip, port))
 
@@ -102,6 +101,7 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
         n_fill_bytes = payload_len - len(payload)
         fill_char = b'a'
         payload = payload + n_fill_bytes * fill_char
+        # MARK:
         sock_out.sendall(payload)
         tx_end_stmp = time.time()
 
@@ -183,6 +183,10 @@ if __name__ == "__main__":
     group.add_argument('-s', '--server', metavar='Address', type=str,
                        help='Run in UDP server mode')
 
+    parser.add_argument('--srv_buffer', type=int, default=512,
+                        metavar='Buffer Size',
+                        help='Server recv buffer size in bytes')
+
     group.add_argument('-c', '--client', metavar='Address', type=str,
                        help='Run in UDP client mode')
     parser.add_argument("--n_packets", type=int, default=10,
@@ -206,8 +210,10 @@ if __name__ == "__main__":
     if args.server:
         ip, port = args.server.split(':')
         port = int(port)
+        SERVER_BUFFER_SIZE = args.srv_buffer
         print('------------------------------------------------------------')
         print('UDP server listening on %s, port %d' % (ip, port))
+        print('Server recv buffer size: %d' % SERVER_BUFFER_SIZE)
         if args.mode == 'RTT':
             print('- Received packets are sent back to port %d' % (port + 1))
         print('------------------------------------------------------------')

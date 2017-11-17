@@ -141,7 +141,7 @@ class StaticSFCManager(BaseSFCManager):
                     # Nova can do everything...
                     srv['availability_zone'] = 'nova'
 
-        elif method == 'fill_nearst':
+        elif method == 'fill_dst':
             sf_num = len(srv_chn)
             flavor_name = srv_chn[0][0]['flavor']
             # Assume other host are equal
@@ -259,7 +259,7 @@ class StaticSFCManager(BaseSFCManager):
             raise SFCManagerError(
                 'Flag wait_complete conflicts with wait_sf in current implementation.')
 
-        if alloc_method not in ('nova_scheduler', 'fill_nearst'):
+        if alloc_method not in ('nova_scheduler', 'fill_dst'):
             raise SFCManagerError('Unknown allocation method for SF servers.')
 
         if chain_method not in ('default', 'min_lat'):

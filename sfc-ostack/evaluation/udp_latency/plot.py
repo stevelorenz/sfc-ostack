@@ -4,6 +4,7 @@
 
 """
 About: Plot Results of Latency Measurements
+       Lesson learned here: Should learn and use pandas...
 
 Email: xianglinks@gmail.com
 """
@@ -32,7 +33,8 @@ font_size = 9
 font_name = 'Monospace'
 mpl.rc('font', family=font_name)
 # mpl.use('TkAgg')
-cmap = cm.get_cmap('jet')
+
+cmap = cm.get_cmap('plasma')
 
 
 def warn_three_std(value_lst):
@@ -49,6 +51,7 @@ def warn_three_std(value_lst):
 
 
 def plot_ipd():
+    """Plot tests for inter-packet delay"""
 
     base_path = './test_result/three_compute/ipd/'
     payload_len = 512
@@ -62,24 +65,7 @@ def plot_ipd():
     #  Calc  #
     ##########
 
-    # Load sf = 0
-    # lat_avg_lst = []
-    # for ipd in (3, 4, 5, 10):
-    #     send_rate = int(np.ceil(payload_len / (ipd / 1000.0)))
-    #     csv_path = os.path.join(base_path,
-    #                             'ipd-ns-%s-512-0-1.csv' % send_rate)
-    #     data = np.genfromtxt(csv_path, delimiter=',')
-    #     cur_lat_arr = data[10:, 1] / 1000.0
-    #     cur_avg = np.average(cur_lat_arr)
-    #     lat_avg_lst.append(cur_avg)
-
-    # lat_avg_map[0] = lat_avg_lst
-    # # MARK: Assume hwci is zero
-    # lat_hwci_map[0] = [0] * len(lat_avg_lst)
-
-    # Load sf = 1, sf = 10, each is tested 10 rounds
     for sf_num in (0, 1, 10):
-        # for sf_num in (1, ):
         lat_avg_lst = []
         lat_hwci_lst = []
         for ipd in (3, 4, 5, 10, 20):
@@ -121,15 +107,18 @@ def plot_ipd():
 
     fig, ax = plt.subplots()
 
-    # x = (3, 4, 5, 10)
     x = (3, 4, 5, 10, 20)
 
-    for method in ('Kernel Forwarding', ):
+    sf_num_lst = (0, 1, 10)
+
+    colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
+
+    for method in ('KF', ):
         label_gen = (
-            method + ' ' + appendix for appendix in ('SF_NUM = 0', 'SF_NUM = 1',
-                                                     'SF_NUM = 10'))
+            method + ', ' + appendix for appendix in ('SF_NUM = 0', 'SF_NUM = 1',
+                                                      'SF_NUM = 10'))
         for sf_num, color, label in zip(
-            (0, 1, 10), ('green', 'blue', 'red'),
+            (0, 1, 10), colors,
             label_gen,
         ):
             y = lat_avg_map[sf_num]
@@ -163,7 +152,103 @@ def plot_ipd():
     fig.savefig('./ipd_three_compute_full.png', dpi=400, format='png')
 
 
+def plot_plen():
+    """Plot tests for UDP payload length"""
+
+    base_path = './test_result/three_compute/plen/'
+    ipd = 4
+    test_round = 10
+    sf_num_lst = (0, 1, 10)
+
+    plen_lst = [2**x * 128 for x in range(0, 5)]
+    print('Payload list: ' + ','.join(map(str, plen_lst)))
+    # sys.exit(1)
+
+    ##########
+    #  Calc  #
+    ##########
+
+    lat_avg_plen = list()
+    lat_hwci_plen = list()
+
+    for sf_num in sf_num_lst:
+        lat_avg_lst = []
+        lat_hwci_lst = []
+        for plen in plen_lst:
+            send_rate = int(np.ceil(plen / (ipd / 1000.0)))
+            cur_rd_avg_lst = list()
+            for rd in range(1, test_round + 1):
+                csv_path = os.path.join(base_path, 'plen-ns-%s-%s-%s-%s.csv'
+                                        % (send_rate, plen, sf_num, rd))
+                cur_lat_arr = np.genfromtxt(csv_path, delimiter=',')[
+                    # MARK: Filter first 10 init packets.
+                    10:, 1] / 1000.0
+                cur_rd_avg_lst.append(np.average(cur_lat_arr))
+
+            lat_avg_lst.append(np.average(cur_rd_avg_lst))
+            lat_hwci_lst.append(
+                (T_FACTOR['99.9-10'] * np.std(cur_rd_avg_lst)) /
+                np.sqrt(test_round - 1)
+            )
+
+        warn_three_std(lat_avg_lst)
+        lat_avg_plen.append(lat_avg_lst)
+        lat_hwci_plen.append(lat_hwci_lst)
+
+    print('Avg:')
+    for idx, lat_lst in enumerate(lat_avg_plen):
+        print('Index number: %d' % idx)
+        print(lat_lst)
+
+    print('HWCI:')
+    for idx, lat_lst in enumerate(lat_hwci_plen):
+        print('Index number: %d' % idx)
+        print(lat_lst)
+
+    ##########
+    #  Plot  #
+    ##########
+
+    fig, ax = plt.subplots()
+
+    width = 0.3
+
+    suffix = ['SF_NUM = %s' % sf for sf in sf_num_lst]
+    colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
+
+    for mt_idx, method in enumerate(['KF']):
+        label_gen = (
+            method + ', ' + suf for suf in suffix)
+
+        for sf_idx, label, color in zip((0, 1, 2), label_gen,
+                                        # ('green', 'blue', 'red')):
+                                        colors):
+            pos = [0 + sf_idx * width] * len(plen_lst)
+            cur_x = [sf_idx * width + x for x in range(1, 6)]
+            ax.bar(cur_x, lat_avg_plen[sf_idx], yerr=lat_hwci_plen[sf_idx],
+                   error_kw=dict(elinewidth=1, ecolor='black'),
+                   width=width, color=color, lw=1, label=label)
+
+    ax.set_xticks([x + (len(sf_num_lst) - 1) *
+                   width / 2.0 for x in range(1, 6)])
+    ax.set_xticklabels(plen_lst, fontsize=font_size, fontname=font_name)
+    ax.set_xlabel('UDP Payload Length (bytes)')
+    # ax.set_xlim(0, 20)
+    # ax.set_yticks(range(0, 7))
+    # ax.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
+    ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
+    ax.set_ylim(0, 14)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, fontsize=font_size - 1,
+              loc='upper right')
+    ax.grid(linestyle='--', lw=0.5)
+
+    fig.show()
+    fig.savefig('./plen_three_compute_full.png', dpi=400, format='png')
+
+
 def plot_single_host():
+    """Plot UDP RTT tests on single host"""
 
     base_path = './test_result/single_node/'
 
@@ -314,6 +399,7 @@ def plot_single_host():
 
 
 def plot_three_host():
+    """Plot UDP RTT tests on three compute hosts"""
 
     base_path = './test_result/three_compute/'
     send_rate = 2048  # byte/s
@@ -470,6 +556,9 @@ if __name__ == "__main__":
         plt.show()
     elif sys.argv[1] == '-i':
         plot_ipd()
+        plt.show()
+    elif sys.argv[1] == '-p':
+        plot_plen()
         plt.show()
     elif sys.argv[1] == '-a':
         plot_single_host()
