@@ -3,9 +3,15 @@
 #######################
 
 *.pem
-# *.txt
+*.tmp
+
+############
+#  Figure  #
+############
 
 *.png
+sfc-ostack/evaluation/udp_latency/*.pdf
+sfc-ostack/evaluation/sfc_start_latency/*.pdf
 
 ###################
 #  Common Python  #

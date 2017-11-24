@@ -20,6 +20,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 
+INIT_PAC_NUM = 20
+
 T_FACTOR_INF = 2.576
 T_FACTOR_TEN = 3.169
 
@@ -37,17 +39,49 @@ mpl.rc('font', family=font_name)
 cmap = cm.get_cmap('plasma')
 
 
-def warn_three_std(value_lst):
+def warn_three_std(value_arr, path=None):
     """Raise exception if the value is not in the three std +- mean value of
-    value_lst
+    value_arr
     """
-    avg = np.average(value_lst)
-    std = np.std(value_lst)
+    avg = np.average(value_arr)
+    std = np.std(value_arr)
 
-    for value in value_lst:
+    for value in value_arr:
         if abs(value - avg) >= 3.0 * std:
-            error_msg = 'Value %s is not located in three std range of list: %s' % (
-                value, ', '.join(map(str, value_lst)))
+            if path:
+                error_msg = 'Value %s is not located in three std range, path: %s' % (
+                    value, path)
+            else:
+                error_msg = 'Value %s is not located in three std range of list: %s' % (
+                    value, ', '.join(map(str, value_arr)))
+            raise RuntimeError(error_msg)
+
+
+def warn_big_data(value_arr, path, fac=10.0):
+    """Raise exception if too big value occurs"""
+    avg = np.average(value_arr)
+    for idx, value in enumerate(value_arr):
+        if value >= fac * avg:
+            raise RuntimeError(
+                'Big(factor:%f) data: %f occurs, index: %d, csv path: %s'
+                % (fac, value, idx, path))
+
+
+def autolabel_bar(ax, rects):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width() / 2.0, 1.05 * height,
+                '%.2f' % float(height), fontsize=font_size - 5,
+                ha='center', va='bottom')
+
+
+def save_fig(fig, path):
+    """Save fig to path"""
+    fig.savefig(path + '.pdf',
+                bbox_inches='tight', dpi=400, format='pdf')
 
 
 def plot_ipd():
@@ -56,7 +90,6 @@ def plot_ipd():
     base_path = './test_result/three_compute/ipd/'
     payload_len = 512
     test_round = 10
-    # test_round = 9
 
     lat_avg_map = dict()
     lat_hwci_map = dict()
@@ -68,17 +101,16 @@ def plot_ipd():
     for sf_num in (0, 1, 10):
         lat_avg_lst = []
         lat_hwci_lst = []
+
         for ipd in (3, 4, 5, 10, 20):
             send_rate = int(np.ceil(payload_len / (ipd / 1000.0)))
-
             cur_rd_avg_lst = list()
-            # Loop for all test rounds
+
             for rd in range(1, test_round + 1):
                 csv_path = os.path.join(base_path, 'ipd-ns-%s-512-%s-%s.csv'
                                         % (send_rate, sf_num, rd))
                 cur_lat_arr = np.genfromtxt(csv_path, delimiter=',')[
-                    # MARK: Filter first 10 init packets.
-                    10:, 1] / 1000.0
+                    INIT_PAC_NUM:, 1] / 1000.0
                 cur_rd_avg_lst.append(np.average(cur_lat_arr))
 
             lat_avg_lst.append(np.average(cur_rd_avg_lst))
@@ -132,15 +164,7 @@ def plot_ipd():
 
     ax.axvline(x=4, ymin=0, ymax=14, ls='--', lw=0.4, color='black')
 
-    # ax.bar(x=4, height=8, bottom=2, width=0.5, color='white', ls='--', lw=1,
-    #       edgecolor='black'
-    #       )
     ax.set_xticks((2, 3, 4, 5, 10, 20))
-    # ax.set_xticks(x + width / 2.0)
-    # ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
-    # ax.set_xlim(0, 20)
-    # ax.set_yticks(range(0, 7))
-    # ax.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
     ax.set_ylim(0, 14)
     handles, labels = ax.get_legend_handles_labels()
@@ -148,8 +172,8 @@ def plot_ipd():
               loc='upper right')
     ax.grid(linestyle='--', lw=0.5)
 
+    save_fig(fig, './ipd_three_compute')
     fig.show()
-    fig.savefig('./ipd_three_compute_full.png', dpi=400, format='png')
 
 
 def plot_plen():
@@ -162,7 +186,6 @@ def plot_plen():
 
     plen_lst = [2**x * 128 for x in range(0, 5)]
     print('Payload list: ' + ','.join(map(str, plen_lst)))
-    # sys.exit(1)
 
     ##########
     #  Calc  #
@@ -181,8 +204,7 @@ def plot_plen():
                 csv_path = os.path.join(base_path, 'plen-ns-%s-%s-%s-%s.csv'
                                         % (send_rate, plen, sf_num, rd))
                 cur_lat_arr = np.genfromtxt(csv_path, delimiter=',')[
-                    # MARK: Filter first 10 init packets.
-                    10:, 1] / 1000.0
+                    INIT_PAC_NUM:, 1] / 1000.0
                 cur_rd_avg_lst.append(np.average(cur_lat_arr))
 
             lat_avg_lst.append(np.average(cur_rd_avg_lst))
@@ -226,25 +248,22 @@ def plot_plen():
             pos = [0 + sf_idx * width] * len(plen_lst)
             cur_x = [sf_idx * width + x for x in range(1, 6)]
             ax.bar(cur_x, lat_avg_plen[sf_idx], yerr=lat_hwci_plen[sf_idx],
-                   error_kw=dict(elinewidth=1, ecolor='black'),
+                   error_kw=dict(elinewidth=1, ecolor='red'),
                    width=width, color=color, lw=1, label=label)
 
     ax.set_xticks([x + (len(sf_num_lst) - 1) *
                    width / 2.0 for x in range(1, 6)])
     ax.set_xticklabels(plen_lst, fontsize=font_size, fontname=font_name)
     ax.set_xlabel('UDP Payload Length (bytes)')
-    # ax.set_xlim(0, 20)
-    # ax.set_yticks(range(0, 7))
-    # ax.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
-    ax.set_ylim(0, 14)
+    ax.set_ylim(0, 12)
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, fontsize=font_size - 1,
               loc='upper right')
     ax.grid(linestyle='--', lw=0.5)
 
+    save_fig(fig, './plen_three_compute')
     fig.show()
-    fig.savefig('./plen_three_compute_full.png', dpi=400, format='png')
 
 
 def plot_single_host():
@@ -356,8 +375,8 @@ def plot_single_host():
               loc='upper left')
     ax.grid(linestyle='--', lw=0.5)
 
+    save_fig(fig, './udp_rtt_single_compute')
     fig.show()
-    fig.savefig('./udp_rtt_single_host.png', dpi=400, format='png')
 
     # --- Plot the abs difference ---
 
@@ -394,29 +413,27 @@ def plot_single_host():
                loc='upper left')
     ax1.grid(linestyle='--', lw=0.5)
 
+    save_fig(fig1, './udp_reldiff_single_compute')
     fig1.show()
-    fig1.savefig('./udp_reldiff_single_host.png', dpi=400, format='png')
 
 
 def plot_three_host():
     """Plot UDP RTT tests on three compute hosts"""
 
-    base_path = './test_result/three_compute/'
-    send_rate = 2048  # byte/s
+    base_path = './test_result/three_compute/chn_rtt/'
+    send_rate = 128000  # byte/s
     payload_len = 512  # byte
+    test_round = 10
 
-    min_fs_num = 0
+    min_fs_num = 1
     max_fs_num = 10
 
     fig, ax = plt.subplots()
 
-    # ax.set_title("Service Function: IP Forwarding", fontsize=font_size + 1,
-    # fontname=font_name)
-
     x = np.arange(min_fs_num, max_fs_num + 1, 1, dtype='int32')
     width = 0.35
 
-    method_tuple = ('lkf-fd', 'lkf-ns')
+    method_tuple = ('rtt-lkf-ns', 'rtt-lkf-fn')
 
     ##########
     #  Calc  #
@@ -432,122 +449,119 @@ def plot_three_host():
             map(str, (method, send_rate, payload_len))
         )
 
+        # Use sf_number as list index
         lat_avg_tmp = []
         lat_hwci_tmp = []
 
         for srv_num in range(min_fs_num, max_fs_num + 1):
-            csv_path = os.path.join(base_path,
-                                    base_file_name + '-%d.csv' % srv_num)
-            data = np.genfromtxt(csv_path, delimiter=',')
-            pack_num = data.shape[0]
-            lat_data = data[:, 1] / 1000.0
-            lat_avg = np.average(lat_data)
-            lat_avg_tmp.append(lat_avg)
-            lat_std = np.std(lat_data)
-            lat_hwci = (T_FACTOR_INF * lat_std) / np.sqrt(pack_num - 1)
-            lat_hwci_tmp.append(lat_hwci)
+            cur_rd_avg_lst = list()
+            for rd in range(1, test_round + 1):
+                csv_path = os.path.join(base_path,
+                                        base_file_name +
+                                        '-%d-%d.csv' % (srv_num, rd))
+                data = np.genfromtxt(csv_path, delimiter=',')
+                lat_data = data[INIT_PAC_NUM:, 1] / 1000.0
+                cur_rd_avg_lst.append(np.average(lat_data))
+
+            warn_three_std(cur_rd_avg_lst)
+            lat_avg_tmp.append(np.average(cur_rd_avg_lst))
+            lat_hwci_tmp.append((T_FACTOR['99.9-10'] *
+                                 np.std(cur_rd_avg_lst)) / np.sqrt(test_round - 1))
 
         lat_avg_map[method] = lat_avg_tmp
         lat_hwci_map[method] = lat_hwci_tmp
 
-        # print('SF num:%d, avg:%f, std:%f, hwci:%f'
-        # % (srv_num, lat_avg, lat_std, lat_hwci))
-
     for method in method_tuple:
-        diff_lst = list()
-        avg_lst = lat_avg_map[method]
-        last = avg_lst[1]
-        for lat in avg_lst[2:]:
-            diff_lst.append(lat - last)
-            last = lat
-        lat_avg_diff_map[method] = diff_lst
-
-    for method in method_tuple:
-        print('Method: %s' % method)
-        print(lat_avg_map[method])
-        print(lat_hwci_map[method])
-        print(lat_avg_diff_map[method])
+        print('# Method: %s' % method)
+        for sf_num in range(0, max_fs_num - min_fs_num + 1):
+            print('SF number: %d, Avg: %f, HWCI: %f'
+                  % (sf_num + 1, lat_avg_map[method][sf_num],
+                     lat_hwci_map[method][sf_num]))
 
     ##########
     #  Plot  #
     ##########
 
+    colors = [cmap(x * 1 / len(method_tuple))
+              for x in range(len(method_tuple))]
+    labels = ('KF, Nova Scheduler Default',
+              'KF, Fill Nearst')
+
     # ------ Plot Abs -------
 
     for method, color, label, pos in zip(
         method_tuple,
-        ('blue', 'green'),
-        ('Kernel forwarding, fill nearst',
-         'Kernel forwarding, nova scheduler'),
-        (0, width)
+        colors,
+        labels,
+        (x * width for x in range(len(method_tuple)))
     ):
 
         y = lat_avg_map[method]
 
-        # ax.plot(x + pos + width / 2, y,
-        # marker='o', markerfacecolor='None', markeredgewidth=1,
-        # markeredgecolor=color, color=color, lw=1, ls='--')
+        rect = ax.bar(x + pos, y, width=width, yerr=lat_hwci_map[method],
+                      label=label, color=color,
+                      error_kw=dict(elinewidth=1, ecolor='red'))
 
-        ax.bar(x + pos, y, width=width, yerr=lat_hwci_map[method],
-               label=label, color=color,
-               error_kw=dict(elinewidth=1, ecolor='black'))
+        autolabel_bar(ax, rect)
+
+        # ax.plot(x + pos, y, color=color, lw=1, ls='--')
 
     ax.set_xlabel("Number of chained SF-servers",
                   fontsize=font_size, fontname=font_name)
     ax.set_xticks(x + width / 2.0)
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
-    # ax.set_yticks(range(0, 7))
-    # ax.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
-    ax.set_ylim(6, 12)
+    ax.set_ylim(4, 9)
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, fontsize=font_size - 2,
               loc='upper left')
     ax.grid(linestyle='--', lw=0.5)
 
-    fig.savefig('./udp_rtt_three_host.png', dpi=400, format='png')
+    save_fig(fig, './udp_rtt_three_compute')
     fig.show()
 
     # --- Plot the abs difference ---
 
-    fig1, ax1 = plt.subplots()
+    # fig1, ax1 = plt.subplots()
 
-    x = np.arange(min_fs_num + 2, max_fs_num + 1, 1, dtype='int32')
-    width = 0.4
+    # x = np.arange(min_fs_num + 2, max_fs_num + 1, 1, dtype='int32')
+    # width = 0.4
 
-    for method, color, label, pos in zip(
-        method_tuple, ('blue', 'green'),
-        ('Kernel forwarding', 'Python forwarding'),
-        (0, width)
-    ):
-        y = lat_avg_diff_map[method]
+    # for method, color, label, pos in zip(
+    #     method_tuple, ('blue', 'green'),
+    #     ('Kernel forwarding', 'Python forwarding'),
+    #     (0, width)
+    # ):
+    #     y = lat_avg_diff_map[method]
 
-        ax1.plot(x + pos, y, label=label,
-                 marker='o', markerfacecolor='None', markeredgewidth=1, markeredgecolor=color,
-                 color=color, lw=1, ls='--')
+    #     ax1.plot(x + pos, y, label=label,
+    #              marker='o', markerfacecolor='None', markeredgewidth=1, markeredgecolor=color,
+    #              color=color, lw=1, ls='--')
 
-        # ax1.bar(x + pos, y, width=width,
-        # label=label, color=color)
+    #     # ax1.bar(x + pos, y, width=width,
+    #     # label=label, color=color)
 
-    ax1.set_xlabel("Number of chained SF-servers",
-                   fontsize=font_size, fontname=font_name)
-    ax1.set_xticks(x + width / 2.0)
-    ax1.set_xticklabels(x, fontsize=font_size, fontname=font_name)
-    # ax1.set_xlim(0 - (width * 2), 11)
-    # ax1.set_yticks(range(0, 7))
-    # ax1.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
-    ax1.set_ylabel("Difference (ms)", fontsize=font_size, fontname=font_name)
-    # ax1.set_ylim(0, 1)
-    handles, labels = ax1.get_legend_handles_labels()
-    ax1.legend(handles, labels, fontsize=font_size,
-               loc='upper left')
-    ax1.grid(linestyle='--', lw=0.5)
+    # ax1.set_xlabel("Number of chained SF-servers",
+    #                fontsize=font_size, fontname=font_name)
+    # ax1.set_xticks(x + width / 2.0)
+    # ax1.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+    # # ax1.set_xlim(0 - (width * 2), 11)
+    # # ax1.set_yticks(range(0, 7))
+    # # ax1.set_yticklabels(range(0, 7), fontsize=font_size, fontname=font_name)
+    # ax1.set_ylabel("Difference (ms)", fontsize=font_size, fontname=font_name)
+    # # ax1.set_ylim(0, 1)
+    # handles, labels = ax1.get_legend_handles_labels()
+    # ax1.legend(handles, labels, fontsize=font_size,
+    #            loc='upper left')
+    # ax1.grid(linestyle='--', lw=0.5)
 
-    fig1.show()
-    fig1.savefig('./udp_reldiff_three_host.png', dpi=400, format='png')
+    # fig1.show()
+    # fig1.savefig('./udp_reldiff_three_host.png', dpi=400, format='png')
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        raise RuntimeError('Missing options.')
     if sys.argv[1] == '-s':
         plot_single_host()
         plt.show()
@@ -561,6 +575,8 @@ if __name__ == "__main__":
         plot_plen()
         plt.show()
     elif sys.argv[1] == '-a':
+        plot_ipd()
+        plot_plen()
         plot_single_host()
         plot_three_host()
         plt.show()
