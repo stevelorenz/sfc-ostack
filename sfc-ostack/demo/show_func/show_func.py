@@ -3,7 +3,7 @@
 # vim:fenc=utf-8
 
 """
-About : Start demo for testing SFC functionality
+About : Show sfc-ostack basic functionalities
 
 Email : xianglinks@gmail.com
 """
@@ -20,10 +20,10 @@ from sfcostack.sfc import manager
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Show functionality of sfc-ostack.')
+        description='Show basic functionalities of sfc-ostack.')
 
     parser.add_argument('conf_file', help='SFC config file(yaml).')
-    parser.add_argument('alloc_method', choices=['nova_scheduler', 'fill_dst'],
+    parser.add_argument('alloc_method', choices=['nova_default', 'fill_one'],
                         help='Method to allocate SF servers on compute hosts')
     parser.add_argument('chain_method', choices=['default', 'min_lat'],
                         help='Method to chain SF servers')
@@ -46,6 +46,7 @@ if __name__ == "__main__":
     log.conf_logger(level=sfc_conf.log.level)
 
     if args.cleanup:
+        print('# Cleanup port chain resources')
         helper.cleanup_port_chn(sfc_conf.auth)
         sys.exit(0)
 
@@ -59,25 +60,12 @@ if __name__ == "__main__":
         sample_ins['name'] = 'sf%d' % idx
         sfc_conf.server_chain.append([sample_ins.copy()])
     sfc_mgr = manager.StaticSFCManager(sfc_conf.auth)
+
     ipdb.set_trace()
+
     sfc = sfc_mgr.create_sfc(sfc_conf, args.alloc_method, args.chain_method,
                              sfc_conf.function_chain.destination_hypervisor,
-                             wait_complete=True, wait_sf=False)
-    ipdb.set_trace()
-
-    # Store hypervisor allocation in a csv file
-    srv_alloc = sfc_mgr._get_srv_chn_alloc(sfc.srv_chn,
-                                           sfc_conf.function_chain.available_hypervisors)
-
-    out_file = '-'.join((args.alloc_method, str(args.number))) + '.csv'
-    with open(out_file, 'w+') as out_stream:
-        for hyper, srv_lst in srv_alloc.items():
-            line = hyper
-            for srv in srv_lst:
-                line += ',%s' % srv
-            line += '\n'
-            out_stream.write()
-
+                             wait_sf_ready=False)
     ipdb.set_trace()
 
     sfc_mgr.delete_sfc(sfc)

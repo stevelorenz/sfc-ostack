@@ -84,21 +84,20 @@ class StaticSFCManager(BaseSFCManager):
 
     def __init__(self, auth_args,
                  mgr_ip='127.0.0.1', mgr_port=6666,
-                 ssh_access=True, log_creation_ts=False
+                 ssh_access=True, return_ts=False
                  ):
         """Init a StaticSFCManager
 
         :param mgr_ip (str): IP address for SF management
         :param mgr_port (int): Port for SF management
         :param auth_args (dict)
-        :param log_creation_ts (Bool): If True, time stamps for creation of SFC
-        are returned by create_sfc function.
         """
-        logger.debug('Init StaticSFCManager on %s:%s' % (mgr_ip, mgr_port))
+        logger.debug(
+            'Init StaticSFCManager, management addr: %s:%s', mgr_ip, mgr_port)
         self.mgr_ip = mgr_ip
         self.mgr_port = mgr_port
         self.ssh_access = ssh_access
-        self.log_creation_ts = log_creation_ts
+        self.return_ts = return_ts
 
         self.conn = connection.Connection(**auth_args)
 
@@ -135,13 +134,13 @@ class StaticSFCManager(BaseSFCManager):
 
     def _alloc_srv_chn(self, srv_chn, method, dst_hyper_name):
         """MARK: Bad hard-coded only used for tests"""
-        if method == 'nova_scheduler':
+        if method == 'nova_default':
             for srv_grp in srv_chn:
                 for srv in srv_grp:
                     # Nova can do everything...
                     srv['availability_zone'] = 'nova'
 
-        elif method == 'fill_dst':
+        elif method == 'fill_one':
             sf_num = len(srv_chn)
             flavor_name = srv_chn[0][0]['flavor']
             # Assume other host are equal
@@ -217,49 +216,47 @@ class StaticSFCManager(BaseSFCManager):
     # -------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------
 
-    def _wait_sf(self, srv_chn, interval=3):
-        """Wait for SF program to be ready"""
-        # srv_fips = srv_chn.get_srv_fips()
-        # check_ips = list()
-        # for grp_fips in srv_fips:
-        # check_ips.extend(grp_fips)
+    def _wait_sf_ready(self, srv_chn, method='socket', interval=3):
+        """Wait for SF conf and programs to be ready"""
 
-        check_num = srv_chn.get_srv_num()
-        logger.debug('Total number of SF servers: %d' % check_num)
+        if method == 'socket':
+            check_num = srv_chn.get_srv_num()
+            logger.debug('Total number of SF servers: %d' % check_num)
 
-        recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        recv_sock.bind((self.mgr_ip, self.mgr_port))
-        recv_sock.settimeout(None)
+            recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            recv_sock.bind((self.mgr_ip, self.mgr_port))
+            recv_sock.settimeout(None)
 
-        # MARK: Timeout MAY be used here
-        while True:
-            if check_num == 0:
-                break
-            _, addr = recv_sock.recvfrom(1024)
-            check_num -= 1
-            debug_info = (
-                '[StaticSFCManager] Recv ready - packet from %s, %d SF(s)to be ready'
-                % (addr[0], check_num)
-            )
-            logger.debug(debug_info)
-            # time.sleep(interval)
+            # MARK: Timeout MAY be used here
+            while True:
+                if check_num == 0:
+                    break
+                _, addr = recv_sock.recvfrom(1024)
+                check_num -= 1
+                debug_info = (
+                    '[StaticSFCManager] Recv ready - packet from %s, %d SF(s)to be ready'
+                    % (addr[0], check_num)
+                )
+                logger.debug(debug_info)
+                # time.sleep(interval)
+
+        # Check if specific file is created on all instances
+        elif method == 'file':
+            pass
 
     def create_sfc(self, sfc_conf,
+                   # TODO: dst_hyper_name SHOULD be removed from para
                    alloc_method, chain_method, dst_hyper_name,
-                   wait_complete=False, wait_sf=True):
-        """Create a SFC
+                   wait_sf_ready=False, wait_method='socket'):
+        """Create a SFC using given allocation and chaining method
 
         :param sfc_conf:
-        :param method(str):
+        :param method (str):
         :param wait_complete (Bool):
-        :param wait_sf (Bool):
+        :param wait_sf_ready (Bool):
         """
 
-        if wait_complete and wait_sf:
-            raise SFCManagerError(
-                'Flag wait_complete conflicts with wait_sf in current implementation.')
-
-        if alloc_method not in ('nova_scheduler', 'fill_dst'):
+        if alloc_method not in ('nova_default', 'fill_one'):
             raise SFCManagerError('Unknown allocation method for SF servers.')
 
         if chain_method not in ('default', 'min_lat'):
@@ -268,7 +265,7 @@ class StaticSFCManager(BaseSFCManager):
         sfc_name = sfc_conf.function_chain.name
         sfc_desc = sfc_conf.function_chain.description
         logger.info(
-            'Create SFC:%s, description:%s. Allocation method:%s, chaining method:%s'
+            'Create SFC: %s, description: %s. Allocation method: %s, chaining method :%s'
             % (sfc_name, sfc_desc, alloc_method, chain_method))
 
         self._alloc_srv_chn(sfc_conf.server_chain,
@@ -282,15 +279,21 @@ class StaticSFCManager(BaseSFCManager):
             sfc_conf.server_chain,
             self.ssh_access, 'pt'
         )
-        srv_chn_start = time.time()
-        logger.info(
-            'Create server chain, wait_complete=%s.' % wait_complete)
-        srv_chn.create(wait_complete=wait_complete)
 
-        if wait_sf:
-            logger.info('Wait all SF(s) to be ready via socket.')
-            self._wait_sf(srv_chn)
-        srv_chn_end = time.time()
+        # MARK: Create networking and instance resources separately
+        srv_chn_ct_st = time.time()
+        srv_chn.create_network()
+
+        # TODO: Get floating IPs
+
+        srv_chn.create_instance()
+
+        if wait_sf_ready:
+            logger.info('Wait all SF(s) to be ready with method: %s.',
+                        wait_method)
+            self._wait_sf_ready(srv_chn, wait_method)
+
+        srv_chn_ct_end = time.time()
 
         new_srv_chn = self._reorder_srv_chn(
             chain_method,
@@ -314,15 +317,15 @@ class StaticSFCManager(BaseSFCManager):
             srv_chn,
             sfc_conf.flow_classifier
         )
-        port_chn_start = time.time()
+        port_chn_st = time.time()
         logger.info('Create port chain.')
         port_chn.create()
         port_chn_end = time.time()
 
-        if self.log_creation_ts:
+        if self.return_ts:
             return (
                 resource.SFC(sfc_name, sfc_desc, srv_chn, port_chn),
-                (srv_chn_start, srv_chn_end, port_chn_start, port_chn_end)
+                (srv_chn_ct_st, srv_chn_ct_end, port_chn_st, port_chn_end)
             )
 
         else:

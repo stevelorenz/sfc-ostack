@@ -5,10 +5,6 @@
 """
 About: SFC Resource
 
-MARK(Zuo, 12.10.2017):
-    Currently all CRUD operations are implemented in the resource classes, which
-    is simple but not architecturally bas. This SHOULD be separated.
-
 Email: xianglinks@gmail.com
 """
 
@@ -20,7 +16,7 @@ from heatclient import client as heatclient
 from keystoneauth1 import loading, session
 from openstack import connection
 
-from sfcostack import hot, log
+from sfcostack import hot, log, utils
 # MARK: CAN be replaced with openstack-neutronclient with v2 API
 from sfcostack.sfc import netsfc_clt
 
@@ -118,6 +114,45 @@ class ServerChain(object):
 
         self._get_network_id()
 
+    #  --- HEAT helper func ---
+
+    def _wait_creation_complete(self, stack_name, status='CREATE_COMPLETE',
+                                timeout=300, interval=3):
+        total_time = 0
+        while total_time < timeout:
+            stack = self.conn.orchestration.find_stack(stack_name)
+            # Not created in the db
+            if not stack:
+                time.sleep(interval)
+                total_time += interval
+                continue
+            elif stack.status == status:
+                return
+            # Create in process
+            else:
+                logger.debug(
+                    'Stack: %s creation is in progress.' % stack_name
+                )
+                time.sleep(interval)
+                total_time += interval
+        raise ServerChainError(
+            'Stack: %s creation timeout!' % stack_name)
+
+    def _wait_deletion_complete(self, stack_name, timeout=300, interval=3):
+        total_time = 0
+        while total_time < timeout:
+            stack = self.conn.orchestration.find_stack(stack_name)
+            # Delete in progress
+            if stack:
+                time.sleep(interval)
+                total_time += interval
+            else:
+                return
+        raise ServerChainError(
+            'Stack: %s deletion timeout!' % stack_name)
+
+    # --- Get server chain info ---
+
     def _get_network_id(self):
         """Get bound network resource IDs"""
         pubnet = self.conn.network.find_network('public')
@@ -158,29 +193,6 @@ class ServerChain(object):
             fip_lst.append(grp_fip_lst)
         return fip_lst
 
-    def get_ssh_args(self):
-        """Get args for SSH access for all instance in the server chain
-
-        :return ssh_args(list): A nested list of SSH args tuple
-        """
-        ssh_args = list()
-        for srv_grp in self.srv_grp_lst:
-            grp_ssh_args = list()
-            for srv in srv_grp:
-                fip_pt = self.conn.network.find_port(
-                    srv['name'] + '_%s' % self.fip_port
-                )
-                fip = list(
-                    self.conn.network.ips(port_id=fip_pt.id))[0].floating_ip_address
-                srv_ssh = srv['ssh']
-                grp_ssh_args.append(
-                    (srv_ssh['user_name'], srv_ssh['pvt_key_file'], fip)
-                )
-            ssh_args.append(grp_ssh_args)
-        return ssh_args
-
-    # --- Used by PortChain ----
-
     def get_srv_ppgrp_name(self):
         """Get name of port pair groups
 
@@ -220,42 +232,16 @@ class ServerChain(object):
             pp_grp_id_lst.append(pp_grp_id)
         return pp_grp_id_lst
 
-    # TODO(zuo): Separate CRUD of ServerChain into neutron network and nova
-    # compute resources
+    # --- CR of server chain ---
 
-    def _get_hot_network(self):
-        pass
-
-    def _get_hot_instance(self):
-        pass
-
-    def create_network(self):
-        """create_network"""
-        pass
-
-    def delete_network(self):
-        """delete_network"""
-        pass
-
-    # MARK: This costs too much time
-    def create_instance(self, wait_complete=True):
-        """Create all instances in the server chain"""
-        pass
-
-    def delete_instance(self, wait_complete=True):
-        """Delete all instances in the server chain"""
-        pass
-
-    # TODO: Add physical region mapping
-    def get_output_hot(self):
+    def get_output_hot(self, only_network=False):
         """Output essential resources as a HOT template
 
-        :retype: str
+        :param only_network (Bool): If True, only add networking resources
         """
         hot_cont = hot.HOT()
         prop = dict()
 
-        # MARK: CAN be better... relative straight forward
         if self.sep_access_port:
             port_suffix = ('pt', 'pt_in', 'pt_out')
         else:
@@ -298,7 +284,9 @@ class ServerChain(object):
                     hot_cont.resource_lst.append(
                         hot.Resource(srv['name'] + '_fip', 'fip', prop))
 
-                # MARK: SHOULD be implemented in vsf
+                if only_network:
+                    return hot_cont.output_yaml_str()
+
                 prop = {
                     'name': srv['name'],
                     'image': srv['image'],
@@ -316,7 +304,7 @@ class ServerChain(object):
 
                 # MARK: Only test RAW bash script
                 if srv.get('init_script', None):
-                    logger.debug('%s, read init bash script, path:%s'
+                    logger.debug('%s, read init bash script, path: %s'
                                  % (srv['name'], srv['init_script']))
                     with open(srv['init_script'], 'r') as init_file:
                         # MARK: | is needed after user_data
@@ -329,13 +317,38 @@ class ServerChain(object):
 
         return hot_cont.output_yaml_str()
 
+    def create_network(self):
+        """Create networking resources"""
+
+        logger.debug(
+            'Create networking resources for server chain: %s, stack name: %s',
+            self.name, self.name
+        )
+        hot_tpl = self.get_output_hot(only_network=True)
+        self.heat_client.stacks.create(stack_name=self.name,
+                                       template=hot_tpl)
+        self._wait_creation_complete(self.name)
+
+    # MARK: Use HEAT updating function
+    def create_instance(self, wait_complete=True):
+        """Create all instances in the server chain"""
+        hot_tpl = self.get_output_hot(only_network=False)
+        sc_stack = self.conn.orchestration.find_stack(self.name)
+        self.heat_client.stacks.update(stack_id=sc_stack.id,
+                                       template=hot_tpl)
+        if wait_complete:
+            self._wait_creation_complete(
+                self.name, status='UPDATE_COMPLETE'
+            )
+
+    @utils.deprecated
     def create(self, wait_complete=True, interval=3, timeout=600):
         """Create server chain using HEAT
 
         :param wait_complete (Bool): Block until the stack has the status COMPLETE
         """
         logger.debug(
-            'Create server chain:%s.' % self.name
+            'Create server chain: %s.' % self.name
         )
         hot_str = self.get_output_hot()
         self.heat_client.stacks.create(stack_name=self.name,
@@ -354,7 +367,8 @@ class ServerChain(object):
                 # Create in process
                 else:
                     logger.debug(
-                        'Server chain creation is in progress.'
+                        'Server chain: %s creation is in progress.',
+                        self.name
                     )
                     time.sleep(interval)
                     total_time += interval
@@ -363,7 +377,7 @@ class ServerChain(object):
 
     def delete(self, wait_complete=True, interval=3, timeout=600):
         logger.debug(
-            'Delete server chain:%s' % self.name
+            'Delete server chain: %s' % self.name
         )
         sc_stack = self.conn.orchestration.find_stack(self.name)
         if not sc_stack:
