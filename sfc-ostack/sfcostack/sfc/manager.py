@@ -14,6 +14,7 @@ import socket
 import time
 from functools import partial
 
+import paramiko
 from openstack import connection
 
 from sfcostack import conf, log
@@ -80,6 +81,9 @@ class StaticSFCManager(BaseSFCManager):
     """SFC manager for static SFC
 
     Static means the SFC CAN not be updated
+
+    MARK:
+        Do not support port pair group feature
     """
 
     def __init__(self, auth_args,
@@ -99,11 +103,14 @@ class StaticSFCManager(BaseSFCManager):
         self.ssh_access = ssh_access
         self.return_ts = return_ts
 
+        # --- Stack API and SSH client ---
         self.conn = connection.Connection(**auth_args)
+        self.ssh_clt = paramiko.SSHClient()
+        self.ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+        # --- Nova compute resources ---
         self.hyper_name_lst = [hyper.name for hyper in
                                self.conn.compute.hypervisors()]
-
         # MARK: CAN be set in the nova.conf in compute node
         self.cpu_allocate_ratio = 1
 
@@ -216,13 +223,19 @@ class StaticSFCManager(BaseSFCManager):
     # -------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------
 
-    def _wait_sf_ready(self, srv_chn, method='socket', interval=3):
+    def _try_ssh_connect(self, ssh_tuple, timeout=300, interval=3):
+        """TODO"""
+        pass
+
+    def _wait_sf_ready(self, srv_chn, method='udp_packet', interval=3):
         """Wait for SF conf and programs to be ready"""
 
-        if method == 'socket':
-            check_num = srv_chn.get_srv_num()
-            logger.debug('Total number of SF servers: %d' % check_num)
+        if method == 'udp_packet':
+            # Get floating IPs for all SF servers
+            fip_lst = srv_chn.get_srv_fips(no_grp=True)
 
+            check_num = len(fip_lst)
+            logger.debug('Total number of SF servers: %d' % check_num)
             recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             recv_sock.bind((self.mgr_ip, self.mgr_port))
             recv_sock.settimeout(None)
@@ -234,15 +247,23 @@ class StaticSFCManager(BaseSFCManager):
                 _, addr = recv_sock.recvfrom(1024)
                 check_num -= 1
                 debug_info = (
-                    '[StaticSFCManager] Recv ready - packet from %s, %d SF(s)to be ready'
+                    'Recv ready-packet from %s, %d SF(s)to be ready'
                     % (addr[0], check_num)
                 )
                 logger.debug(debug_info)
-                # time.sleep(interval)
+                time.sleep(0.5)
 
-        # Check if specific file is created on all instances
+        # TODO: Check if specific file is created on all instances
         elif method == 'file':
+            dft_path = '~/.cache/sf_ready.csv'
+            # Get SSH tuples for SF servers
+            ssh_tuple_lst = srv_chn.get_srv_ssh_tuple(no_grp=True)
+            # Simple polling for all instances
             pass
+        else:
+            raise SFCManagerError(
+                'Unknown waiting method for SF(s) to be ready.'
+            )
 
     def create_sfc(self, sfc_conf,
                    # TODO: dst_hyper_name SHOULD be removed from para
@@ -283,15 +304,21 @@ class StaticSFCManager(BaseSFCManager):
         # MARK: Create networking and instance resources separately
         srv_chn_ct_st = time.time()
         srv_chn.create_network()
-
-        # TODO: Get floating IPs
-
-        srv_chn.create_instance()
+        # Do not block for updating to be finished
+        srv_chn.create_instance(wait_complete=False)
 
         if wait_sf_ready:
             logger.info('Wait all SF(s) to be ready with method: %s.',
                         wait_method)
             self._wait_sf_ready(srv_chn, wait_method)
+        else:
+            logger.warn(
+                (
+                    'Do not wait for SF(s) to be ready. '
+                    'Instances creation are not completed. '
+                    'This is not recommeded!'
+                )
+            )
 
         srv_chn_ct_end = time.time()
 

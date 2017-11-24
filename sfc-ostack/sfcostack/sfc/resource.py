@@ -173,7 +173,7 @@ class ServerChain(object):
             srv_num += len(srv_grp)
         return srv_num
 
-    def get_srv_fips(self):
+    def get_srv_fips(self, no_grp=False):
         """Get a list of floating IPs of all server instances
 
         Used by SFC manager for SF checking and remote access
@@ -191,7 +191,43 @@ class ServerChain(object):
                     self.conn.network.ips(port_id=fip_pt.id))[0].floating_ip_address
                 grp_fip_lst.append(fip)
             fip_lst.append(grp_fip_lst)
+
+        if no_grp:
+            n_fip_lst = list()
+            for fip_grp in fip_lst:
+                n_fip_lst.extend(fip_grp)
+            return n_fip_lst
+
         return fip_lst
+
+    def get_srv_ssh_tuple(self, no_grp=False):
+        """Get a list of SSH tuples for all server instances
+
+        SSH Tuple: (fip, username, pvt_key)
+        """
+        ssh_tuple_lst = list()
+        for srv_grp in self.srv_grp_lst:
+            grp_ssh_tuple_lst = list()
+            for srv in srv_grp:
+                srv_ssh = srv['ssh']
+                fip_pt = self.conn.network.find_port(
+                    srv['name'] + '_%s' % self.fip_port
+                )
+                fip = list(
+                    self.conn.network.ips(port_id=fip_pt.id))[0].floating_ip_address
+                grp_ssh_tuple_lst.append(
+                    (fip, srv_ssh['user_name'], srv_ssh['pvt_key_file'])
+                )
+
+            ssh_tuple_lst.append(grp_ssh_tuple_lst)
+
+        if no_grp:
+            n_ssh_tuple_lst = list()
+            for grp_ssh_tuple_lst in ssh_tuple_lst:
+                n_ssh_tuple_lst.extend(grp_ssh_tuple_lst)
+            return n_ssh_tuple_lst
+
+        return ssh_tuple_lst
 
     def get_srv_ppgrp_name(self):
         """Get name of port pair groups
