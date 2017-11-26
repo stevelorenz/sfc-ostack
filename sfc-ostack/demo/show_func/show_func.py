@@ -59,13 +59,15 @@ if __name__ == "__main__":
     for idx in range(args.number):
         sample_ins['name'] = 'sf%d' % idx
         sfc_conf.server_chain.append([sample_ins.copy()])
-    sfc_mgr = manager.StaticSFCManager(sfc_conf.auth)
+    sfc_mgr = manager.StaticSFCManager(
+        sfc_conf.auth, mgr_ip='127.0.0.1', mgr_port=6666
+    )
 
     ipdb.set_trace()
 
     sfc = sfc_mgr.create_sfc(sfc_conf, args.alloc_method, args.chain_method,
                              sfc_conf.function_chain.destination_hypervisor,
-                             wait_sf_ready=False)
+                             wait_sf_ready=True)
     ipdb.set_trace()
 
     sfc_mgr.delete_sfc(sfc)

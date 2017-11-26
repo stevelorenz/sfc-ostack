@@ -28,8 +28,8 @@ LEVELS = {
 FORMAT = {
     'default': '%(asctime)s %(message)s',
     'DEFAULT': '%(asctime)s %(message)s',
-    'debug': '%(asctime)s %(levelname)-8s %(module)s %(lineno)d %(message)s',
-    'DEBUG': '%(asctime)s %(levelname)-8s %(module)s %(lineno)d %(message)s',
+    'debug': '%(asctime)s %(levelname)-8s %(module)s %(threadName)s %(lineno)d %(message)s',
+    'DEBUG': '%(asctime)s %(levelname)-8s %(module)s %(threadName)s %(lineno)d %(message)s',
     'info': '%(asctime)s %(levelname)-8s %(module)s %(message)s',
     'INFO': '%(asctime)s %(levelname)-8s %(module)s %(message)s'
 }

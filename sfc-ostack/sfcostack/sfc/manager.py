@@ -11,6 +11,7 @@ Email: xianglinks@gmail.com
 import logging
 import random
 import socket
+import threading
 import time
 from functools import partial
 
@@ -227,15 +228,16 @@ class StaticSFCManager(BaseSFCManager):
         """TODO"""
         pass
 
-    def _wait_sf_ready(self, srv_chn, method='udp_packet', interval=3):
+    def _wait_sf_ready(self, srv_chn, method='udp_packet', interval=0.5):
         """Wait for SF conf and programs to be ready"""
 
         if method == 'udp_packet':
             # Get floating IPs for all SF servers
             fip_lst = srv_chn.get_srv_fips(no_grp=True)
-
             check_num = len(fip_lst)
-            logger.debug('Total number of SF servers: %d' % check_num)
+            logger.debug(
+                'Total number of to be waited SF servers: %d' % check_num
+            )
             recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             recv_sock.bind((self.mgr_ip, self.mgr_port))
             recv_sock.settimeout(None)
@@ -247,11 +249,11 @@ class StaticSFCManager(BaseSFCManager):
                 _, addr = recv_sock.recvfrom(1024)
                 check_num -= 1
                 debug_info = (
-                    'Recv ready-packet from %s, %d SF(s)to be ready'
+                    'Recv ready-packet from %s, remain %d SF(s) to be ready'
                     % (addr[0], check_num)
                 )
                 logger.debug(debug_info)
-                time.sleep(0.5)
+                time.sleep(interval)
 
         # TODO: Check if specific file is created on all instances
         elif method == 'file':
@@ -268,7 +270,7 @@ class StaticSFCManager(BaseSFCManager):
     def create_sfc(self, sfc_conf,
                    # TODO: dst_hyper_name SHOULD be removed from para
                    alloc_method, chain_method, dst_hyper_name,
-                   wait_sf_ready=False, wait_method='socket'):
+                   wait_sf_ready=False, wait_method='udp_socket'):
         """Create a SFC using given allocation and chaining method
 
         :param sfc_conf:
@@ -304,13 +306,15 @@ class StaticSFCManager(BaseSFCManager):
         # MARK: Create networking and instance resources separately
         srv_chn_ct_st = time.time()
         srv_chn.create_network()
-        # Do not block for updating to be finished
-        srv_chn.create_instance(wait_complete=False)
 
         if wait_sf_ready:
             logger.info('Wait all SF(s) to be ready with method: %s.',
                         wait_method)
-            self._wait_sf_ready(srv_chn, wait_method)
+            wait_sf_thread = threading.Thread(
+                target=self._wait_sf_ready,
+                args=(srv_chn, wait_method)
+            )
+            wait_sf_thread.start()
         else:
             logger.warn(
                 (
@@ -320,6 +324,9 @@ class StaticSFCManager(BaseSFCManager):
                 )
             )
 
+        srv_chn.create_instance(wait_complete=True)
+        # Block main thread until all SFs are ready
+        wait_sf_thread.join()
         srv_chn_ct_end = time.time()
 
         new_srv_chn = self._reorder_srv_chn(

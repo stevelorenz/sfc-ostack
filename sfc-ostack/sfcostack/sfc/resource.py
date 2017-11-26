@@ -32,6 +32,11 @@ class SFCRscError(Exception):
     pass
 
 
+class SFCDespError(SFCRscError):
+    """SFC Descriptor error"""
+    pass
+
+
 class ServerChainError(SFCRscError):
     """ServerChain error"""
     pass
@@ -47,14 +52,20 @@ class SFCError(SFCRscError):
     pass
 
 
-class SFCDesp(object):
-    """SFC Descriptor"""
-    pass
-
-
 ###################
 #  SFC Resources  #
 ###################
+
+class SFCDesp(object):
+    """TODO: SFC Descriptor(Config), used by manager to CRUD SFC
+
+    SHOULD contain config about:
+        - SFC classifier configs
+        - SFC networking configs
+        - SF instance ordering, dependency and init config
+    """
+    pass
+
 
 """
 MARK(Zuo, 12-10.2017):
