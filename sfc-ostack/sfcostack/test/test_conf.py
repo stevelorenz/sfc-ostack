@@ -31,3 +31,7 @@ def test_SFCConf():
     assert sample_server['image'] == 'ubuntu-cloud'
     assert sample_server['flavor'] == 'm.test'
     assert sample_server['init_script'] == './init_sf.sh'
+
+    assert sfc_conf.sfc_mgr_conf.typ == 'static'
+    assert sfc_conf.sfc_mgr_conf.mgr_ip == '192.168.0.1'
+    assert sfc_conf.sfc_mgr_conf.mgr_port == 6666

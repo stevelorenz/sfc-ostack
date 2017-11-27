@@ -32,8 +32,8 @@ class SFCRscError(Exception):
     pass
 
 
-class SFCDespError(SFCRscError):
-    """SFC Descriptor error"""
+class SFCConfigError(SFCRscError):
+    """SFCConfig error"""
     pass
 
 
@@ -56,8 +56,8 @@ class SFCError(SFCRscError):
 #  SFC Resources  #
 ###################
 
-class SFCDesp(object):
-    """TODO: SFC Descriptor(Config), used by manager to CRUD SFC
+class SFCConfig(object):
+    """TODO: SFC Config(Descriptor), used by manager to allocate and CRUD SFC
 
     SHOULD contain config about:
         - SFC classifier configs
@@ -78,6 +78,11 @@ server remain unchanged.
 
 # TODO: Add get and set methods for server groups instead of playing with nested
 # lists
+
+
+class ServerGroup(object):
+    """TODO: ServerGroup -> PortGroup"""
+    pass
 
 
 class ServerChain(object):
@@ -331,36 +336,35 @@ class ServerChain(object):
                     hot_cont.resource_lst.append(
                         hot.Resource(srv['name'] + '_fip', 'fip', prop))
 
-                if only_network:
-                    return hot_cont.output_yaml_str()
+                # Add server instances
+                if not only_network:
+                    prop = {
+                        'name': srv['name'],
+                        'image': srv['image'],
+                        'flavor': srv['flavor'],
+                        'networks': networks
+                    }
 
-                prop = {
-                    'name': srv['name'],
-                    'image': srv['image'],
-                    'flavor': srv['flavor'],
-                    'networks': networks
-                }
+                    if srv.get('ssh', None):
+                        prop['key_name'] = srv['ssh']['pub_key_name']
 
-                if srv.get('ssh', None):
-                    prop['key_name'] = srv['ssh']['pub_key_name']
+                    if srv.get('availability_zone', None):
+                        prop['availability_zone'] = srv['availability_zone']
+                        logger.debug('%s, availability zone: %s'
+                                     % (srv['name'], srv['availability_zone']))
 
-                if srv.get('availability_zone', None):
-                    prop['availability_zone'] = srv['availability_zone']
-                    logger.debug('%s, availability zone: %s'
-                                 % (srv['name'], srv['availability_zone']))
+                    # MARK: Only test RAW bash script
+                    if srv.get('init_script', None):
+                        logger.debug('%s, read init bash script, path: %s'
+                                     % (srv['name'], srv['init_script']))
+                        with open(srv['init_script'], 'r') as init_file:
+                            # MARK: | is needed after user_data
+                            prop.update(
+                                {'user_data': '|\n' + init_file.read()}
+                            )
 
-                # MARK: Only test RAW bash script
-                if srv.get('init_script', None):
-                    logger.debug('%s, read init bash script, path: %s'
-                                 % (srv['name'], srv['init_script']))
-                    with open(srv['init_script'], 'r') as init_file:
-                        # MARK: | is needed after user_data
-                        prop.update(
-                            {'user_data': '|\n' + init_file.read()}
-                        )
-
-                hot_cont.resource_lst.append(
-                    hot.Resource(srv['name'], 'server', prop))
+                    hot_cont.resource_lst.append(
+                        hot.Resource(srv['name'], 'server', prop))
 
         return hot_cont.output_yaml_str()
 

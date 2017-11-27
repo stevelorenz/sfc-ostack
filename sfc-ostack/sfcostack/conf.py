@@ -157,6 +157,7 @@ class SFCConf(object):
         """Init a conf descriptor"""
 
         self._cloud_conf = None
+        self.sfc_mgr_conf = None
         self._sfc_conf = None
         self._log_conf = None
 
@@ -181,12 +182,14 @@ class SFCConf(object):
 
     def _construct_sfc_conf(self):
         """Construct a addict formatted SFC conf from nested dict"""
-        for sec in ('log', 'cloud', 'SFC'):
+        for sec in ('log', 'cloud', 'SFC_manager', 'SFC'):
             if sec not in self._conf_dict:
                 raise ConfigError('Missing %s base section!' % sec)
         self._log_conf = ADict(self._conf_dict['log'])
         self._cloud_conf = ADict(self._conf_dict['cloud'])
         self._sfc_conf = ADict(self._conf_dict['SFC'])
+
+        self.sfc_mgr_conf = ADict(self._conf_dict['SFC_manager'])
 
         self._set_cloud_auth(self._cloud_conf.auth)
         self._set_sfc_function_chain(self._sfc_conf.function_chain)

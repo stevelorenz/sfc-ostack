@@ -1,12 +1,12 @@
 #
 # About  : Sample template for sfc-ostack configuration file
-#          Used for static creation of SFC
+#          Used for static creation of SFC(s)
 #
 # Format : YAML
 #
 # Mark   :
 #
-# 1. For cloud auth parameters, check openstack-pythonsdk doc.
+# 1. Cloud authentication use Keystone V3 API.
 #
 # 2. For flow_classifier parameters, check the official API ref:
 #    https://docs.openstack.org/networking-sfc/latest/contributor/api.html
@@ -17,7 +17,6 @@
 # Logging configs
 log:
   level: INFO
-
 
 # Cloud configs
 cloud:
@@ -31,15 +30,22 @@ cloud:
     user_domain_name: default
     password: stack
 
+# SFC manager configs
+SFC_manager:
+  typ: static
+  mgr_ip: 192.168.0.1
+  mgr_port: 6666
 
-# SFC(Service Function Chaining) configs
+# SFC configs
+# TODO: Support multiple SFC sections, currently only one SFC section is parsed
 SFC:
   # Chain parameters
   function_chain:
     name: udp_forwarding_dst_9999
     description: A simple forwarding chain for flows with destination UDP port 9999
     availability_zone: nova
-    # A list of avaiable hypervisors for allocating SFC
+    # A ordered list of available hypervisors for allocating SFC
+    # The hypervisors are listed according to the allocating priority
     available_hypervisors:
       - comnets-ostack-1
       - comnets-ostack-2
