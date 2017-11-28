@@ -425,15 +425,15 @@ def plot_three_host():
     payload_len = 512  # byte
     test_round = 10
 
-    min_fs_num = 1
+    min_fs_num = 8
     max_fs_num = 10
 
     fig, ax = plt.subplots()
 
     x = np.arange(min_fs_num, max_fs_num + 1, 1, dtype='int32')
-    width = 0.35
+    width = 0.2
 
-    method_tuple = ('rtt-lkf-ns', 'rtt-lkf-fn')
+    method_tuple = ('rtt-lkf-ns', 'rtt-lkf-fn', 'rtt-lkf-nsrd')
 
     ##########
     #  Calc  #
@@ -484,8 +484,11 @@ def plot_three_host():
 
     colors = [cmap(x * 1 / len(method_tuple))
               for x in range(len(method_tuple))]
-    labels = ('KF, Nova Scheduler Default',
-              'KF, Fill Nearst')
+    labels = (
+        'KF, Nova Scheduler Default',
+        'KF, Fill One',
+        'KF, NSD Reordered'
+    )
 
     # ------ Plot Abs -------
 
@@ -508,7 +511,7 @@ def plot_three_host():
 
     ax.set_xlabel("Number of chained SF-servers",
                   fontsize=font_size, fontname=font_name)
-    ax.set_xticks(x + width / 2.0)
+    ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
     ax.set_ylim(4, 9)
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)

@@ -122,24 +122,29 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
     sock_out.close()
 
 
-def run_client(ip, port, n_packets, payload_len, send_rate, output_file):
+def run_client(ip, port, n_packets, payload_len, send_rate, output_file,
+               run_recv=True):
     """Run client"""
     sender = multiprocessing.Process(
         target=send_packets,
         args=(ip, port, n_packets, payload_len, send_rate)
     )
 
-    listen_port = port + 1
-    receiver = multiprocessing.Process(
-        target=recv_packets,
-        args=(listen_port, n_packets, payload_len, output_file))
+    if run_recv:
+        listen_port = port + 1
+        receiver = multiprocessing.Process(
+            target=recv_packets,
+            args=(listen_port, n_packets, payload_len, output_file))
 
-    receiver.start()
+        logger.info('Client runs receiver')
+        receiver.start()
+        receiver.join()
+
+    logger.info('Client runs sender')
     sender.start()
 
     # Block main process until sub-process finished
     sender.join()
-    receiver.join()
 
 
 ################################################################################
@@ -201,16 +206,19 @@ if __name__ == "__main__":
                         help='Logging level')
     parser.add_argument("--output_file", default='latency.log', type=str,
                         help='Result output file path')
+    parser.add_argument('--no_recv', action='store_true',
+                        help='Client doest not run receiver')
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level,
                         handlers=[logging.StreamHandler()],
                         format=fmt_str)
 
+    SERVER_BUFFER_SIZE = args.srv_buffer
+
     if args.server:
         ip, port = args.server.split(':')
         port = int(port)
-        SERVER_BUFFER_SIZE = args.srv_buffer
         print('------------------------------------------------------------')
         print('UDP server listening on %s, port %d' % (ip, port))
         print('Server recv buffer size: %d' % SERVER_BUFFER_SIZE)
@@ -230,5 +238,9 @@ if __name__ == "__main__":
         print('- Send packets to port %d' % port)
         print('- Receive packets from port %d' % (port + 1))
         print('------------------------------------------------------------')
+        run_recv = True
+        if args.no_recv:
+            print('- Client does not run receiver')
+            run_recv = False
         run_client(ip, port, args.n_packets, args.payload_len,
-                   args.send_rate, args.output_file)
+                   args.send_rate, args.output_file, run_recv=run_recv)

@@ -293,7 +293,8 @@ class StaticSFCManager(BaseSFCManager):
         # Block main thread until all SFs are ready
         logger.info(
             'All server instances are launched, waiting for SF programs')
-        wait_sf_thread.join()
+        if wait_sf_ready:
+            wait_sf_thread.join()
         srv_chn_ct_end = time.time()
 
         # Log server chain allocation mapping
