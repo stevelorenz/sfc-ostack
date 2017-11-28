@@ -94,7 +94,7 @@ if __name__ == "__main__":
             base_cmd += '--send_rate %s ' % (send_rate)
             base_cmd += '--output_file %s ' % (output_file)
 
-            warm_up_cmd = base_cmd + '--n_packets 50 --no_recv'
+            warm_up_cmd = base_cmd + '--n_packets 50 --clt_no_recv'
             test_cmd = base_cmd + '--n_packets %s' % n_packets
 
             # Create SFC
@@ -104,12 +104,12 @@ if __name__ == "__main__":
             # Run a warm up
             print('Run warm up')
             stdin, stdout, stderr = proxy_ssh_clt.exec_command(warm_up_cmd)
-            print(stdout.read())
+            print(stdout.read().decode())
 
             # Run RTT test
             print('Run RTT test')
             stdin, stdout, stderr = proxy_ssh_clt.exec_command(test_cmd)
-            print(stdout.read())
+            print(stdout.read().decode())
 
             time.sleep(3)
 

@@ -138,13 +138,14 @@ def run_client(ip, port, n_packets, payload_len, send_rate, output_file,
 
         logger.info('Client runs receiver')
         receiver.start()
-        receiver.join()
 
     logger.info('Client runs sender')
     sender.start()
 
     # Block main process until sub-process finished
     sender.join()
+    if run_recv:
+        receiver.join()
 
 
 ################################################################################
@@ -206,8 +207,8 @@ if __name__ == "__main__":
                         help='Logging level')
     parser.add_argument("--output_file", default='latency.log', type=str,
                         help='Result output file path')
-    parser.add_argument('--no_recv', action='store_true',
-                        help='Client doest not run receiver')
+    parser.add_argument('--clt_no_recv', action='store_true',
+                        help='Client doest not run receiver, used for warming up')
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level,
@@ -237,10 +238,10 @@ if __name__ == "__main__":
         print('UDP client connected to %s, port %d' % (ip, port))
         print('- Send packets to port %d' % port)
         print('- Receive packets from port %d' % (port + 1))
-        print('------------------------------------------------------------')
         run_recv = True
-        if args.no_recv:
+        if args.clt_no_recv:
             print('- Client does not run receiver')
             run_recv = False
+        print('------------------------------------------------------------')
         run_client(ip, port, args.n_packets, args.payload_len,
                    args.send_rate, args.output_file, run_recv=run_recv)
