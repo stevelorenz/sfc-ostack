@@ -8,6 +8,7 @@ Email : xianglinks@gmail.com
 """
 
 import binascii
+import socket
 
 import dpkt
 
@@ -22,12 +23,16 @@ if __name__ == "__main__":
             eth = dpkt.ethernet.Ethernet(buf)
 
             print('## Ethernet Frame:')
+            print('src_mac: %s' % (binascii.hexlify(eth.src).decode()))
+            print('dst_mac: %s' % (binascii.hexlify(eth.dst).decode()))
 
             print('## IP Packet:')
             ip = eth.data
             print('packet len: %d' % ip.len)
             print('header len: %d' % ip.hl)
-            print('src_ip: %s, dst_ip: %s' % (ip.src, ip.dst))
+            print('src_ip: %s, dst_ip: %s' %
+                  (socket.inet_ntoa(ip.src),
+                   socket.inet_ntoa(ip.dst)))
             print('checksum: %x' % ip.sum)
 
             print('## UDP Segment:')
@@ -35,7 +40,7 @@ if __name__ == "__main__":
             print('src_port: %d' % udp.sport)
             print('dst_port: %d' % udp.dport)
             print('checksum: %x' % udp.sum)
-            print('payload: %s' % binascii.hexlify(udp.data).decode())
+            # print('payload: %s' % binascii.hexlify(udp.data).decode())
 
             parsed_num += 1
             if parsed_num == pack_num:
