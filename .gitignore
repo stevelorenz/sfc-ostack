@@ -4,6 +4,7 @@
 
 *.pem
 *.tmp
+*.pcap
 
 ############
 #  Figure  #
