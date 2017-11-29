@@ -28,7 +28,9 @@ T_FACTOR_TEN = 3.169
 T_FACTOR = {
     '99-10': 3.169,
     '99.9-10': 4.587,
-    '99-inf': 2.576
+    '99-inf': 2.576,
+    '99-15': 2.947,
+    '99.9-15': 4.073
 }
 
 font_size = 9
@@ -46,14 +48,14 @@ def warn_three_std(value_arr, path=None):
     avg = np.average(value_arr)
     std = np.std(value_arr)
 
-    for value in value_arr:
+    for idx, value in enumerate(value_arr):
         if abs(value - avg) >= 3.0 * std:
             if path:
-                error_msg = 'Value %s is not located in three std range, path: %s' % (
-                    value, path)
+                error_msg = 'Index: %d, Value: %s is not located in three std range, path: %s' % (
+                    idx, value, path)
             else:
-                error_msg = 'Value %s is not located in three std range of list: %s' % (
-                    value, ', '.join(map(str, value_arr)))
+                error_msg = 'Index: %d, Value: %s is not located in three std range of list: %s' % (
+                    idx, value, ', '.join(map(str, value_arr)))
             raise RuntimeError(error_msg)
 
 
@@ -65,6 +67,16 @@ def warn_big_data(value_arr, path, fac=10.0):
             raise RuntimeError(
                 'Big(factor:%f) data: %f occurs, index: %d, csv path: %s'
                 % (fac, value, idx, path))
+
+
+def del_outliers(value_arr, ext_value=100):
+    """Delete outliers in the array"""
+    del_idxs = []
+    for idx, value in enumerate(value_arr):
+        if value >= ext_value:
+            del_idxs.append(idx)
+    new_arr = np.delete(value_arr, del_idxs)
+    return new_arr
 
 
 def autolabel_bar(ax, rects):
@@ -414,6 +426,7 @@ def plot_single_host():
     ax1.grid(linestyle='--', lw=0.5)
 
     save_fig(fig1, './udp_reldiff_single_compute')
+
     fig1.show()
 
 
@@ -425,13 +438,13 @@ def plot_three_host():
     payload_len = 512  # byte
     test_round = 10
 
-    min_fs_num = 8
+    min_fs_num = 1
     max_fs_num = 10
 
     fig, ax = plt.subplots()
 
     x = np.arange(min_fs_num, max_fs_num + 1, 1, dtype='int32')
-    width = 0.2
+    width = 0.25
 
     method_tuple = ('rtt-lkf-ns', 'rtt-lkf-fn', 'rtt-lkf-nsrd')
 
@@ -445,6 +458,7 @@ def plot_three_host():
     lat_avg_diff_map = dict()
 
     for method in method_tuple:
+
         base_file_name = '-'.join(
             map(str, (method, send_rate, payload_len))
         )
@@ -454,6 +468,13 @@ def plot_three_host():
         lat_hwci_tmp = []
 
         for srv_num in range(min_fs_num, max_fs_num + 1):
+
+            # Tmp dev
+            if method == 'rtt-lkf-nsrd' and srv_num == 7:
+                test_round = 15
+            else:
+                test_round = 10
+
             cur_rd_avg_lst = list()
             for rd in range(1, test_round + 1):
                 csv_path = os.path.join(base_path,
@@ -461,11 +482,12 @@ def plot_three_host():
                                         '-%d-%d.csv' % (srv_num, rd))
                 data = np.genfromtxt(csv_path, delimiter=',')
                 lat_data = data[INIT_PAC_NUM:, 1] / 1000.0
+                # lat_data = del_outliers(lat_data)
                 cur_rd_avg_lst.append(np.average(lat_data))
 
-            warn_three_std(cur_rd_avg_lst)
+            warn_three_std(cur_rd_avg_lst, '%s, %s' % (method, srv_num))
             lat_avg_tmp.append(np.average(cur_rd_avg_lst))
-            lat_hwci_tmp.append((T_FACTOR['99.9-10'] *
+            lat_hwci_tmp.append((T_FACTOR['99.9-%d' % test_round] *
                                  np.std(cur_rd_avg_lst)) / np.sqrt(test_round - 1))
 
         lat_avg_map[method] = lat_avg_tmp
@@ -505,7 +527,7 @@ def plot_three_host():
                       label=label, color=color,
                       error_kw=dict(elinewidth=1, ecolor='red'))
 
-        autolabel_bar(ax, rect)
+        # autolabel_bar(ax, rect)
 
         # ax.plot(x + pos, y, color=color, lw=1, ls='--')
 

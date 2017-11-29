@@ -15,7 +15,7 @@ import socket
 import sys
 import time
 
-fmt_str = '%(asctime)s %(levelname)-8s %(message)s'
+fmt_str = '%(asctime)s %(levelname)-8s %(threadName)s %(message)s'
 level = {
     'INFO': logging.INFO,
     'DEBUG': logging.DEBUG,

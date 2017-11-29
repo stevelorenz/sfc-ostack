@@ -32,8 +32,14 @@ if __name__ == "__main__":
     ap.add_argument('proxy_fip', help='Floating IP of proxy instance')
     ap.add_argument('pvt_key_file', help='SSH private key file')
 
-    ap.add_argument('-r', '--test_round', default=10, type=int,
-                    help='Test round')
+    ap.add_argument('--n_packets', default=5000, type=int,
+                    help='Number of sent packets for RTT testing')
+    ap.add_argument('--min_round', default=1, type=int,
+                    help='Minimal test round')
+    ap.add_argument('--max_round', default=1, type=int,
+                    help='Maximal test round')
+    # ap.add_argument('-t', '--timeout', default=300, type=int,
+    # help='Timeout if UDP client on the proxy has no response')
     ap.add_argument('-s', '--server', default='10.0.12.12:9999',
                     help='Address of UDP echo server')
 
@@ -52,7 +58,7 @@ if __name__ == "__main__":
     proxy_fip = args.proxy_fip
     pvt_key_file = args.pvt_key_file
 
-    n_packets = 5000
+    n_packets = args.n_packets
     send_rate = 128000
     payload_len = 512
 
@@ -76,13 +82,15 @@ if __name__ == "__main__":
                           username='ubuntu', key_filename=pvt_key_file)
     print('Create SSH client to the proxy instance')
 
+    kill_cmd = 'killall python3'
+
     for srv_num in range(min_sf_num, max_sf_num + 1):
         print('# Current server number: %d' % srv_num)
         sfc_conf.server_chain = list()
         for idx in range(srv_num):
             sample_ins['name'] = 'sf%d' % idx
             sfc_conf.server_chain.append([sample_ins.copy()])
-        for rd in range(1, args.test_round + 1):
+        for rd in range(args.min_round, args.max_round + 1):
             print('# Current test round: %d' % rd)
             output_file = '-'.join(
                 map(str, (profile, send_rate, payload_len, srv_num, rd))
@@ -101,11 +109,13 @@ if __name__ == "__main__":
             sfc = sfc_mgr.create_sfc(sfc_conf, alloc_method,
                                      chain_method, wait_sf_ready=True)
 
-            # Run a warm up
-            print('Run warm up')
-            stdin, stdout, stderr = proxy_ssh_clt.exec_command(warm_up_cmd)
-            print(stdout.read().decode())
-
+            # Run warm ups
+            for warm_rd in range(2):
+                print('Run warm up')
+                stdin, stdout, stderr = proxy_ssh_clt.exec_command(warm_up_cmd)
+                print(stdout.read().decode())
+            # Langsamer bitte...
+            time.sleep(3)
             # Run RTT test
             print('Run RTT test')
             stdin, stdout, stderr = proxy_ssh_clt.exec_command(test_cmd)
