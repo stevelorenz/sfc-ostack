@@ -470,7 +470,7 @@ def plot_three_host():
         for srv_num in range(min_fs_num, max_fs_num + 1):
 
             # Tmp dev
-            if method == 'rtt-lkf-nsrd' and srv_num == 7:
+            if method == 'rtt-lkf-nsrd':
                 test_round = 15
             else:
                 test_round = 10
@@ -485,7 +485,7 @@ def plot_three_host():
                 # lat_data = del_outliers(lat_data)
                 cur_rd_avg_lst.append(np.average(lat_data))
 
-            warn_three_std(cur_rd_avg_lst, '%s, %s' % (method, srv_num))
+            # warn_three_std(cur_rd_avg_lst, '%s, %s' % (method, srv_num))
             lat_avg_tmp.append(np.average(cur_rd_avg_lst))
             lat_hwci_tmp.append((T_FACTOR['99.9-%d' % test_round] *
                                  np.std(cur_rd_avg_lst)) / np.sqrt(test_round - 1))
