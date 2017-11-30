@@ -68,7 +68,7 @@ if __name__ == "__main__":
         'Bind forwards send socket to egress interface: %s' % out_iface)
     send_sock.bind((out_iface, 0))
 
-    pack_arr = bytearray()
+    pack_arr = bytearray(4096)
 
     recv_num = 0
     while True:
@@ -87,4 +87,4 @@ if __name__ == "__main__":
             new_dst_mac_b = binascii.hexlify(pack_arr[0:dst_mac_len])
             logger.debug('New MAC address: %s', new_dst_mac_b.decode())
 
-        send_sock.send(pack_arr[:])
+        send_sock.send(pack_arr[0:pack_len])
