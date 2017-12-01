@@ -1,6 +1,14 @@
 #!/bin/bash
-# About: Init script for python forwarding
+# About: (Depreciated!) Init script for OpenVswitch forwarding
+#        Use raw socket forwarding instead
+# Issue:
+#    - OVS bridge IP is not in the neutron port's database, ARP requests are filtered by neutron firewall
+#    - OVS bridge does not handle backwards traffic in the chain, which sometime happens during tests
+
 # Email: xianglinks@gmail.com
+
+CTL_IP="192.168.12.10"
+CTL_PORT=6666
 
 # Setup ingress and egress interface
 ip link set eth1 up
@@ -59,3 +67,7 @@ ovs-ofctl add-flow br0 "in_port=local actions=mod_nw_src:$SRC_IP,mod_nw_dst:$DST
 # Distribute the SF program by any other method before running, for example via HTTP server
 curl 192.168.100.1:8888/udp_forwarding.py -o /home/ubuntu/udp_forwarding.py
 python3 /home/ubuntu/udp_forwarding.py > /dev/null 2>&1 &
+
+# Send a ready packet to controller
+# MARK: This CAN be done in the SF program
+echo -n "SF is ready" > /dev/udp/$CTL_IP/$CTL_PORT

@@ -27,6 +27,12 @@ lint-all:
 	@echo "Lint all bash src with shellcheck..."
 	@shellcheck $(BASHSRC_ALL)
 
+lint-py:
+	@echo "Lint all python src with flake8..."
+	@flake8 --exclude ./venv --ignore=E501,F401,E402,F841 \
+		--show-source --statistics --max-complexity=15 --exit-zero \
+		$(PYSRC_ALL)
+
 format-all:
 	@echo "Format all python src with autopep8..."
 	@autopep8 -i $(PYSRC_ALL)

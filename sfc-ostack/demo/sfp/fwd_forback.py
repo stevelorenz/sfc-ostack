@@ -105,5 +105,7 @@ if __name__ == "__main__":
 
     fw_proc = multiprocessing.Process(target=forwards_forward)
     bw_proc = multiprocessing.Process(target=backwards_forward)
-    fw_proc.run()
-    bw_proc.run()
+    fw_proc.start()
+    bw_proc.start()
+    fw_proc.join()
+    bw_proc.join()

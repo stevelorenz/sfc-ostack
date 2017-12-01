@@ -4,11 +4,9 @@
 
 ## Catalog ##
 
-- [sfc-ostack](./sfc-ostack/README.md)
+- [sfc-ostack](./sfc-ostack/README.md): Source code, evolutions and demos of sfc-ostack framework.
 
-- [sfcclient](./sfcclient/README.md)
-
-- [up_stack](./up_stack/README.md)
+- [up_stack](./up_stack/README.md): Scripts for "playing" with OpenStack on multiple nodes.
 
 ## Maintainer ##
 

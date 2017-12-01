@@ -4,6 +4,7 @@
 # Email: xianglinks@gmail.com
 
 CTL_IP="192.168.12.10"
+CTL_PORT=6666
 SUBNET_CIDR="10.0.12.0/32"
 SRC_ADDR="10.0.12.4/32"
 DST_ADDR="10.0.12.12/32"
@@ -27,4 +28,6 @@ ip route add $DST_ADDR dev eth2
 curl $CTL_IP:8888/fwd_raw_sock.py -o /home/ubuntu/fwd_raw_sock.py
 python3 /home/ubuntu/fwd_raw_sock.py > /dev/null 2>&1 &
 
-# MARK: The SF program MUST send a ready packet to the controller
+# Send a ready packet to controller
+# MARK: This CAN be done in the SF program
+echo -n "SF is ready" > /dev/udp/$CTL_IP/$CTL_PORT

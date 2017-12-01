@@ -1,3 +1,4 @@
 # Demo #
 
-- test_func: Test basic functionalities of SFC
+- show_func: Script to show functionalities of sfc-ostack
+- sfp: POC service function programs

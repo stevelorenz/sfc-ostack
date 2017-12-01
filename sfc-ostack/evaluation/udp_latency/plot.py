@@ -69,7 +69,7 @@ def warn_big_data(value_arr, path, fac=10.0):
                 % (fac, value, idx, path))
 
 
-def del_outliers(value_arr, ext_value=100):
+def del_outliers(value_arr, ext_value=10):
     """Delete outliers in the array"""
     del_idxs = []
     for idx, value in enumerate(value_arr):
@@ -470,10 +470,10 @@ def plot_three_host():
         for srv_num in range(min_fs_num, max_fs_num + 1):
 
             # Tmp dev
-            if method == 'rtt-lkf-nsrd':
-                test_round = 15
-            else:
-                test_round = 10
+            # if method == 'rtt-lkf-nsrd':
+            #     test_round = 10
+            # else:
+            #     test_round = 10
 
             cur_rd_avg_lst = list()
             for rd in range(1, test_round + 1):
@@ -481,8 +481,8 @@ def plot_three_host():
                                         base_file_name +
                                         '-%d-%d.csv' % (srv_num, rd))
                 data = np.genfromtxt(csv_path, delimiter=',')
-                lat_data = data[INIT_PAC_NUM:, 1] / 1000.0
-                # lat_data = del_outliers(lat_data)
+                lat_data = data[INIT_PAC_NUM:(5000 - INIT_PAC_NUM), 1] / 1000.0
+                lat_data = del_outliers(lat_data)
                 cur_rd_avg_lst.append(np.average(lat_data))
 
             # warn_three_std(cur_rd_avg_lst, '%s, %s' % (method, srv_num))
