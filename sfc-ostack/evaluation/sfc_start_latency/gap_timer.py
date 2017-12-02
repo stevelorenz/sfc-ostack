@@ -13,6 +13,7 @@ import logging.handlers
 import os
 import signal
 import socket
+import struct
 import sys
 import time
 
@@ -25,12 +26,12 @@ level = {
 }
 logger = logging.getLogger(__name__)
 
-# Minus len for send time stamp
-MAX_ALLOWED_UDP_PAYLOAD = (512 - 18)
+TS_STR_LEN = 18
+MAX_ALLOWED_UDP_PAYLOAD = (512 - TS_STR_LEN * 10)
 RECV_BUFFER_SIZE = 512
 
 
-def run_server_pm(addr):
+def run_server(addr):
     """Run UDP server with payload modification mode
 
     - The client send packet(payload) with first byte b'a' - old payload
@@ -49,7 +50,7 @@ def run_server_pm(addr):
     csv_file = open(OUTPUT_FILE, 'a+')
 
     def exit_server(*args):
-        logger.debug('SIGTERM detected.')
+        logger.debug('SIGTERM detected, save all data in the buffer and exit.')
         recv_sock.close()
         # Sync buffered data to the disk
         csv_file.flush()
@@ -60,36 +61,31 @@ def run_server_pm(addr):
     signal.signal(signal.SIGTERM, exit_server)
 
     try:
-        # MARK: Keep running until the process is killed
         round_num = 0
-        while True:
+        while round_num < TEST_ROUND:
             pack = recv_sock.recv(RECV_BUFFER_SIZE)
-
-            # if round_num % 2 == 0:
-            #     pack = b'a1234'
-            # else:
-            #     pack = b'b,1234,5678'
-
-            # time.sleep(1)
-
             # SFC is not created
             if pack.startswith(b'a'):
                 chn_created = False
                 # Update time stamp for old payload
                 last_old_pload_ts = str(time.time())
                 # Used for checking time sync status
-                apack_info = (
-                    'ts: %s, Recv a A packet: %s. last a pack ts: %s'
+                debug_info = (
+                    'TS: %s, Recv a A packet: %s. last a pack ts: %s'
                     % (time.time(), pack.decode('ascii'), last_old_pload_ts)
                 )
-                logger.debug(apack_info)
+                logger.debug(debug_info)
 
             if pack.startswith(b'b'):
                 recv_bpack_ts = str(time.time())
-                logger.debug('Recv a B packet. ts: %s' % recv_bpack_ts)
+                logger.debug(
+                    'TS: %s, Recv a B packet: %s' % (recv_bpack_ts,
+                                                     pack.decode('ascii'))
+                )
                 if not chn_created:
-                    logger.debug('SFC is just created.')
+                    logger.debug('SFC should be just created.')
                     chn_created = True
+                    round_num += 1
                     # Total SFC creation delay
                     # Unpack time stamp data in the payload
                     ts_str = pack.decode('ascii')
@@ -97,24 +93,24 @@ def run_server_pm(addr):
                     # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
                     # First element: bbb...
                     ts_lst = ts_str.split(',')[1:]
-                    ts_lst.append(recv_bpack_ts)
-                    ts_lst.append(last_old_pload_ts)
+                    ts_lst.append(recv_bpack_ts)  # first b
+                    ts_lst.append(last_old_pload_ts)  # last a
                     try:
                         csv_file.write(','.join(ts_lst))
                         csv_file.write('\n')
                     except ValueError:
+                        csv_file.close()
                         sys.exit(0)
                 else:
                     logger.debug('SFC is already created.')
                     logger.debug('Payload: %s' % pack.decode('ascii'))
-            round_num += 1
     except KeyboardInterrupt:
         logger.info('KeyboardInterrupt')
+        csv_file.close()
         sys.exit(0)
 
 
 def run_client(addr):
-    send_sock = socket.socket(socket.AF_INET,)
     """Run UDP Client
 
     MARK: The accuracy of the time.sleep() depends on the underlying OS
@@ -133,7 +129,7 @@ def run_client(addr):
     base_payload = 'a' * PAYLOAD_LEN
     pack_num = 0
     while True:
-        # Send time stamp
+        # Send time stamp and packet number
         send_ts = str(time.time())
         payload = ','.join((base_payload, str(pack_num), send_ts))
         logger.debug('Send payload: %s' % payload)
@@ -151,10 +147,6 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-s', '--server', metavar='Address', type=str,
                        help='Run in UDP server mode')
-    parser.add_argument('-m', '--mode', type=str,
-                        choices=['pm'], help='Mode for measurements')
-    parser.add_argument('-d', '--max_delay', type=float, default=0.005,
-                        help='Maximal allowed packet latency in second')
     parser.add_argument('-r', '--round', type=int, default=5,
                         help='Number of test rounds')
     parser.add_argument('-o', '--output_file', type=str, default='chn_ct.csv',
@@ -163,7 +155,7 @@ if __name__ == "__main__":
     group.add_argument('-c', '--client', metavar='Address', type=str,
                        help='Run in UDP client mode')
     parser.add_argument('--send_interval', type=float, default=0.001,
-                        help='Client send interval in second')
+                        help='Client send interval in second, default 1ms')
     parser.add_argument('--payload_len', type=int, default=1,
                         help='Client payload length')
 
@@ -190,10 +182,8 @@ if __name__ == "__main__":
         addr = (ip, int(port))
         TEST_ROUND = args.round
         OUTPUT_FILE = args.output_file
-        if args.mode == 'pm':
-            info_str = ('Run in payload modification mode.')
-            logger.info('Run UDP server on %s:%s. %s' % (ip, port, info_str))
-            run_server_pm(addr)
+        logger.info('Run UDP server on %s:%s.' % (ip, port))
+        run_server(addr)
 
     if args.client:
         SEND_INTERVAL = args.send_interval

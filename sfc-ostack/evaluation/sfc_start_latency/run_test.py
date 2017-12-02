@@ -3,9 +3,7 @@
 # vim:fenc=utf-8
 
 """
-About: SFC start time measurements
-
-       Use payload modification(pm) mode of ./st_timer.py
+About: SFC start and gap time measurements
 
        - Before SFC creation: start with b'a'
        - After SFC creation: start with b'b'
@@ -17,24 +15,17 @@ import argparse
 import os
 import subprocess
 import sys
-sys.path.insert(0, '../')
 import time
 
 import paramiko
-
 from openstack import connection
-from sfc_mgr import EvaSFCMgr
+
 from sfcostack import conf
 from sfcostack.sfc import manager
 
 
-def _get_floating_ip(pt_name):
-    ins_port = conn.network.find_port(pt_name)
-    fip = list(conn.network.ips(port_id=ins_port.id))[0].floating_ip_address
-    return fip
-
-
 def _ssh_cmd(ip, port, user, ssh_key, cmd):
+    """Run command multiple times via SSH"""
     ssh_clt = paramiko.SSHClient()
     ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     while True:
@@ -57,12 +48,11 @@ def _ssh_cmd(ip, port, user, ssh_key, cmd):
     ssh_clt.close()
 
 
-def test_sfc_ct(mode=0):
-    """Test chain start time"""
-    print('[TEST] Test SFC start time with python forwarding.')
-
+def run_test(method):
+    """Test SFC start and gap time"""
+    print('[TEST]')
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
-        ts_out_file = 'sfc-ts-ins-%d-%d.csv' % (mode, srv_num)
+        ts_out_file = '%s-sfc-ts-ins-%d.csv' % (method, srv_num)
         CRT_RUN_CTIMER = RUN_CTIMER
         CRT_RUN_CTIMER += '-o %s ' % ts_out_file
         CRT_RUN_CTIMER += '-l ERROR > /dev/null 2>&1 &'
@@ -132,47 +122,25 @@ def test_sfc_ct(mode=0):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description='Run SFC start time test.')
+    ap = argparse.ArgumentParser(
+        description='Run SFC start and gap time tests.')
+
     ap.add_argument('min_sf', type=int, help='Minimal number of SF server')
     ap.add_argument('max_sf', type=int, help='Maximal number of SF server')
-    ap.add_argument('-r', '--round', type=int, default=1,
-                    help='Number of rounds for testing')
-    ap.add_argument('--add_round', type=int, default=1,
-                    help='Additional round for testing')
-    ap.add_argument('-m', '--mode', type=int, choices=[0, 1], default=0,
-                    help=('Measure mode.'
-                          '0: Without checking for SF status.'
-                          '1: With checking for SF status, smaller Gap-time')
-                    )
-
     ap.add_argument('dst_addr', metavar='IP:PORT',
                     help='Fixed IP and port of the dst instance')
     ap.add_argument('dst_fip', help='Floating IP of the dst instance')
 
-    ap.add_argument('--clean', help='Clear created SFC resources, used for tests',
-                    action='store_true')
-    ap.add_argument('--full_clean',
-                    help='Also kill ctime_timer process on dst instance',
-                    action='store_true')
-    # ap.add_argument('--debug', help='Run in debug mode...',
-    #                 action='store_true')
+    ap.add_argument('-r', '--round', type=int, default=1,
+                    help='Number of rounds for testing')
+    ap.add_argument('--add_round', type=int, default=1,
+                    help='Additional round for testing')
 
     if len(sys.argv) == 1:
         ap.print_help()
         sys.exit()
 
     args = ap.parse_args()
-
-    auth_args = {
-        'auth_url': 'http://192.168.100.1/identity/v3',
-        'project_name': 'admin',
-        'user_domain_name': 'default',
-        'project_domain_name': 'default',
-        'username': 'admin',
-        'password': 'stack',
-    }
-    # Connection to the Ostack
-    conn = connection.Connection(**auth_args)
 
     MIN_SF_NUM = args.min_sf
     MAX_SF_NUM = args.max_sf
@@ -181,17 +149,12 @@ if __name__ == "__main__":
     TEST_ROUND = args.round
     ADD_ROUND = args.add_round
 
-    SSH_USER = 'ubuntu'
-    SFC_CONF = './sfc_conf.yaml'
-    SSH_PKEY = '/home/zuo/sfc_ostack_test/sfc_test.pem'
-    INIT_SCRIPT = './init_py_forwarding.sh'
+    # Command to run and kill gap_timer.py
+    RUN_GTIMER = ''
+    RUN_GTIMER += 'nohup python3 /home/ubuntu/ctime_timer.py '
+    RUN_GTIMER += '-s %s ' % (DST_ADDR)
+    RUN_GTIMER += '-r %s ' % TEST_ROUND
 
-    # Command to run and kill ctime_timer.py
-    RUN_CTIMER = ''
-    RUN_CTIMER += 'nohup python3 /home/ubuntu/ctime_timer.py '
-    RUN_CTIMER += '-s %s ' % (DST_ADDR)
-    RUN_CTIMER += '-m pm '
-    RUN_CTIMER += '-r %s ' % TEST_ROUND
     KILL_CTIMER = "pkill -f 'python3 /home/ubuntu/ctime_timer.py'"
 
     # Command to run python forwarder
@@ -201,23 +164,5 @@ if __name__ == "__main__":
     RUN_FWD += '> /dev/null 2>&1 &'
     print('[DEBUG] Cmd to run forwarder: %s' % RUN_FWD)
 
-    # Try to cleanup all old resouces
-    if args.clean or args.full_clean:
-        print('[INFO] Run clean func')
-        for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
-            try:
-                subprocess.run(
-                    ['python3', '../sfc_mgr.py', SFC_CONF,
-                     INIT_SCRIPT, 'delete', '%d' % srv_num],
-                    check=True)
-            except Exception:
-                pass
-            if args.full_clean:
-                print('[INFO] Run full clean func')
-                _ssh_cmd(DST_FIP, 22, SSH_USER, SSH_PKEY, KILL_CTIMER)
-
-        sys.exit(0)
-
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
-
-    test_sfc_ct(args.mode)
+    run_test(args.mode)

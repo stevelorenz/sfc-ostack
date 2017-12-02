@@ -7,38 +7,55 @@ log:
 cloud:
 
   auth:
-    auth_url: http://192.168.100.1/identity/v3
-    project_name: admin
+    auth_url:
     project_domain_name: default
-    username: admin
     user_domain_name: default
-    password: stack
+    project_name:
+    username:
+    password:
+
+SFC_manager:
+  typ: static
+  mgr_ip:
+  mgr_port: 6666
 
 SFC:
 
   function_chain:
     name: udp_dst_9999
-    description: A Function chain for flows with destination UDP port 9999
+    description: A function chain for flows with destination UDP port 9999
+    availability_zone: nova
+    available_hypervisors:
+      - comnets-ostack-1
+      - comnets-ostack-2
+      - comnets-ostack-3
+    destination_hypervisor: comnets-ostack-1
 
   flow_classifier:
     name: udp_dst_9999_fc
-    description: UDP traffic from public network
+    description:
     ethertype: IPv4
     protocol: UDP
     source_port_range_min: 0
     source_port_range_max: 65535
     destination_port_range_min: 9999
     destination_port_range_max: 9999
-    # MARK: Set the IP after building test topo
-    source_ip_prefix: 10.0.0.6/32
-    destination_ip_prefix: 10.0.0.7/32
+    source_ip_prefix:
+    destination_ip_prefix:
     logical_source_port: src_pt
     logical_destination_port: dst_pt
 
   network:
-    net_name: net1
-    subnet_name: subnet1
+    pubnet_name:
+    net_name:
+    subnet_name:
 
-  server_chain:
-
+  sample_server:
+    image: ubuntu-cloud
+    flavor: m.test
+    init_script: ./init_raw_sock.sh
+    ssh:
+      user_name: ubuntu
+      pub_key_name: test
+      pvt_key_file: ./test.pem
 ...
