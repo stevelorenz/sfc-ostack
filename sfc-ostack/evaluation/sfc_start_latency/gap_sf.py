@@ -174,16 +174,17 @@ def forwards_forward(recv_sock, send_sock):
                 logger.debug(
                     'Old IP header checksum: %s',
                     binascii.hexlify(
-                        pack_arr[hd_offset + 10:hd_offset + 13]).decode()
+                        pack_arr[hd_offset + 10:hd_offset + 12]).decode()
                 )
                 # Set checksum field to zero
-                pack_arr[hd_offset + 10:hd_offset + 13] = struct.pack('>H', 0)
+                pack_arr[hd_offset + 10:hd_offset + 12] = struct.pack('>H', 0)
                 new_iph_cksum = calc_ih_cksum(
                     pack_arr[hd_offset:hd_offset + ihl]
                 )
                 logger.debug('New IP header checksum: %s', hex(new_iph_cksum))
                 pack_arr[hd_offset + 10:hd_offset +
-                         13] = struct.pack('>H', new_iph_cksum)
+                         # MARK: Convert to big-endian
+                         12] = struct.pack('<H', new_iph_cksum)
                 pack_len += ts_len
                 logger.debug(
                     'After appending time stamp, pack_len: %d', pack_len
