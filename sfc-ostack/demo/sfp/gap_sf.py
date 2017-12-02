@@ -3,8 +3,7 @@
 # vim:fenc=utf-8
 
 """
-About: Add a timestamp after UDP payload
-       Simple SF example...
+About: SF program for SFC gap time measurements
 
 Email: xianglinks@gmail.com
 """
@@ -80,17 +79,36 @@ def bind_raw_sock_pair(in_iface, out_iface):
     return (recv_sock, send_sock)
 
 
-def forwards_forward(ingress_iface, egress_iface):
-    """forwards_forward"""
-    recv_sock, send_sock = bind_raw_sock_pair(ingress_iface, egress_iface)
-    pack_arr = bytearray(BUFFER_SIZE)
+def carry_around_add(a, b):
+    c = a + b
+    return (c & 0xffff) + (c >> 16)
 
-    ts_len = len(str(time.time()).encode('ascii'))
+
+def calc_ih_cksum(hd_b_arr):
+    """Calculate IP header checksum
+    MARK: To generate a new checksum, the checksum field itself is set to zero
+
+    :para hd_b_arr: Bytes array of IP header
+    :retype: int
+    """
+    s = 0
+    for i in range(0, len(hd_b_arr), 2):
+        a, b = struct.unpack('>2B', hd_b_arr[i:i + 2])
+        w = a + (b << 8)
+        s = carry_around_add(s, w)
+    return ~s & 0xffff
+
+
+def forwards_forward(recv_sock, send_sock):
+    """forwards_forward"""
+    # Bytes array for a ethernet frame
+    pack_arr = bytearray(BUFFER_SIZE)
 
     while True:
         pack_len = recv_sock.recv_into(pack_arr, BUFFER_SIZE)
-        recv_time = time.time()
-        recv_time_b = str(time.time()).encode('ascii')
+        # MARK: Maybe too slow here
+        recv_time_b = (b',' + str(time.time()).encode('ascii'))
+        ts_len = len(recv_time_b)
 
         #####################
         #  Mod UDP Payload  #
@@ -112,9 +130,9 @@ def forwards_forward(ingress_iface, egress_iface):
             logger.debug(
                 'Recv a IP packet, header len: %d, total len: %d', ihl,
                 old_ip_tlen)
-            # Check if is UDP packet
             proto = struct.unpack(
                 '>B', pack_arr[hd_offset + 9:hd_offset + 10])[0]
+            # Check if is UDP packet
             if proto == 17:
                 logger.debug('Recv a UDP packet')
                 logger.debug(
@@ -125,21 +143,48 @@ def forwards_forward(ingress_iface, egress_iface):
                 # Set checksum to zero
                 # MARK: If the checksum is cleared to zero, then checksuming is disabled.
                 pack_arr[hd_offset + 6:hd_offset + 8] = struct.pack('>H', 0)
-                # Payload length
-                old_udp_pl_len = struct.unpack('>H',
-                                               pack_arr[hd_offset + 4:hd_offset + 6])[0]
+
+                # UDP payload length
+                old_udp_pl_len = struct.unpack(
+                    '>H', pack_arr[hd_offset + 4:hd_offset + 6]
+                )[0] - UDP_HDL
+
+                # Mod payload from b'a' to b'b'
+                pack_arr[udp_pl_offset:udp_pl_offset +
+                         PL_A_LEN] = b'b' * PL_A_LEN
+
                 # Append recv time stamp at end
                 pack_arr[udp_pl_offset + old_udp_pl_len:udp_pl_offset +
                          old_udp_pl_len + ts_len] = recv_time_b
 
-                # Set UDP and IP length with new payload
-                new_udp_pl_len = old_udp_pl_len + ts_len
-                pack_arr[hd_offset + 4:hd_offset + 6] = struct.pack('>H',
-                                                                    new_udp_pl_len)
+                # Set UDP and IP total length with new payload
+                new_udp_tlen = struct.pack(
+                    '>H', (old_udp_pl_len + UDP_HDL + ts_len),
+                )
+                pack_arr[hd_offset + 4:hd_offset + 6] = new_udp_tlen
+
                 hd_offset -= ihl
-                new_ip_tlen = old_ip_tlen + ts_len
-                pack_arr[hd_offset + 2:hd_offset + 4] = struct.pack('>H',
-                                                                    new_ip_tlen)
+                new_ip_tlen = struct.pack(
+                    '>H', (old_ip_tlen + ts_len)
+                )
+                pack_arr[hd_offset + 2:hd_offset + 4] = new_ip_tlen
+
+                # MARK: IP total length changed. MUST recalculate the IP header checksum
+                # TODO: For faster calc, this should be implemented in C
+                logger.debug(
+                    'Old IP header checksum: %s',
+                    binascii.hexlify(
+                        pack_arr[hd_offset + 10:hd_offset + 12]).decode()
+                )
+                # Set checksum field to zero
+                pack_arr[hd_offset + 10:hd_offset + 12] = struct.pack('>H', 0)
+                new_iph_cksum = calc_ih_cksum(
+                    pack_arr[hd_offset:hd_offset + ihl]
+                )
+                logger.debug('New IP header checksum: %s', hex(new_iph_cksum))
+                pack_arr[hd_offset + 10:hd_offset +
+                         # MARK: Convert to big-endian
+                         12] = struct.pack('<H', new_iph_cksum)
                 pack_len += ts_len
                 logger.debug(
                     'After appending time stamp, pack_len: %d', pack_len
@@ -149,9 +194,9 @@ def forwards_forward(ingress_iface, egress_iface):
         send_sock.send(pack_arr[0:pack_len])
 
 
-def backwards_forward(ingress_iface, egress_iface):
+def backwards_forward(recv_sock, send_sock):
     """backwards_forward"""
-    recv_sock, send_sock = bind_raw_sock_pair(egress_iface, ingress_iface)
+
     pack_arr = bytearray(BUFFER_SIZE)
 
     while True:
@@ -173,15 +218,36 @@ def backwards_forward(ingress_iface, egress_iface):
 
 if __name__ == "__main__":
 
-    ingress_iface = 'eth1'
-    egress_iface = 'eth2'
+    if len(sys.argv) < 2:
+        PL_A_LEN = 1
+        CTL_IP = '192.168.12.10'
+        CTL_PORT = 6666
 
+        ingress_iface = 'eth1'
+        egress_iface = 'eth2'
+    else:
+        PL_A_LEN = sys.argv[1]
+        CTL_IP = sys.argv[2]
+        CTL_PORT = int(sys.argv[3])
+
+        ingress_iface = sys.argv[4]
+        egress_iface = sys.argv[5]
+
+    # Bind sockets and start forwards and backwards processes
+    recv_sock, send_sock = bind_raw_sock_pair(ingress_iface, egress_iface)
     fw_proc = multiprocessing.Process(target=forwards_forward,
-                                      args=(ingress_iface, egress_iface))
+                                      args=(recv_sock, send_sock))
+
+    recv_sock, send_sock = bind_raw_sock_pair(egress_iface, ingress_iface)
     bw_proc = multiprocessing.Process(target=backwards_forward,
-                                      args=(ingress_iface, egress_iface))
+                                      args=(recv_sock, send_sock))
     fw_proc.start()
     bw_proc.start()
+
+    # Send a ready packet to SFC manager
+    ctl_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    ctl_sock.sendto(b'ready', (CTL_IP, CTL_PORT))
+    ctl_sock.close()
 
     fw_proc.join()
     bw_proc.join()

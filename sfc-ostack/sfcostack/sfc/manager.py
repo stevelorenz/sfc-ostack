@@ -246,10 +246,12 @@ class StaticSFCManager(BaseSFCManager):
 
         sfc_name = sfc_conf.function_chain.name
         sfc_desc = sfc_conf.function_chain.description
+        time_info = list()
         logger.info(
             'Create SFC: %s, description: %s. Allocation method: %s, chaining method :%s'
             % (sfc_name, sfc_desc, alloc_method, chain_method))
 
+        start_ts = time.time()
         self._alloc_srv_chn(
             alloc_method,
             sfc_conf.server_chain,
@@ -269,7 +271,7 @@ class StaticSFCManager(BaseSFCManager):
 
         logger.info('Create server chain: %s', srv_chn.name)
         # MARK: Create networking and instance resources separately
-        srv_chn_ct_st = time.time()
+
         srv_chn.create_network()
 
         if wait_sf_ready:
@@ -290,12 +292,18 @@ class StaticSFCManager(BaseSFCManager):
             )
 
         srv_chn.create_instance(wait_complete=True)
+        # Server chain launching time
+        time_info.append(time.time() - start_ts)
         # Block main thread until all SFs are ready
         logger.info(
             'All server instances are launched, waiting for SF programs')
         if wait_sf_ready:
+            start_ts = time.time()
             wait_sf_thread.join()
-        srv_chn_ct_end = time.time()
+            # Waiting time for SF program
+            time_info.append(time.time() - start_ts)
+        else:
+            time_info.append(0)
 
         # Log server chain allocation mapping
         alloc_map = self._get_srv_chn_alloc(
@@ -307,6 +315,7 @@ class StaticSFCManager(BaseSFCManager):
         )
 
         if chain_method == 'min_lat':
+            start_ts = time.time()
             if alloc_method != 'nova_default':
                 raise SFCManagerError(
                     'Chaining method min_lat only support allocation method nova_default'
@@ -337,6 +346,10 @@ class StaticSFCManager(BaseSFCManager):
                 reorder_srv_chn_conf,
                 self.ssh_access, 'pt'
             )
+            # Time for reorder the chain
+            time_info.append(time.time() - start_ts)
+        else:
+            time_info.append(0)
 
         port_chn = resource.PortChain(
             sfc_conf.auth,
@@ -345,22 +358,20 @@ class StaticSFCManager(BaseSFCManager):
             srv_chn,
             sfc_conf.flow_classifier
         )
-        port_chn_st = time.time()
         logger.info('Create port chain: %s', port_chn.name)
+        start_ts = time.time()
         port_chn.create()
-        port_chn_end = time.time()
+        # Time for creating port chain
+        time_info.append(time.time() - start_ts)
 
         if self.log_ts:
-            logger.info(
-                'SFC creation timestamp: ' +
-                ','.join(
-                    map(str, (srv_chn_ct_st, srv_chn_ct_end, port_chn_st, port_chn_end)))
-            )
+            logger.info('Time info: %s',
+                        ','.join(map(str, time_info)))
 
         if self.return_ts:
             return (
                 resource.SFC(sfc_name, sfc_desc, srv_chn, port_chn),
-                (srv_chn_ct_st, srv_chn_ct_end, port_chn_st, port_chn_end)
+                time_info
             )
 
         else:
