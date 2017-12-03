@@ -24,7 +24,7 @@ from sfcostack import conf, log
 from sfcostack.sfc import manager
 
 
-def _ssh_cmd(ip, port, user, ssh_key, cmd, exit_status=0):
+def _ssh_cmd(ip, port, user, ssh_key, cmd, exit_status=None):
     """Run command multiple times via SSH"""
     ssh_clt = paramiko.SSHClient()
     ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -40,8 +40,9 @@ def _ssh_cmd(ip, port, user, ssh_key, cmd, exit_status=0):
     channel = tran.open_session()
     channel.exec_command(cmd)
     status = channel.recv_exit_status()
-    if status != exit_status:
-        raise RuntimeError('Run command:%s failed via SSH' % cmd)
+    if exit_status:
+        if status != exit_status:
+            raise RuntimeError('Run command:%s failed via SSH' % cmd)
     ssh_clt.close()
 
 
@@ -70,7 +71,8 @@ def run_test():
         print('[DEBUG] Cmd for running GTIMER: %s' % CRT_RUN_GTIMER)
 
         # Run gap timer on the dst instance
-        _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, CRT_RUN_GTIMER)
+        _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, CRT_RUN_GTIMER,
+                 exit_status=0)
         time.sleep(3)
 
         print('[DEBUG] Current server number: %d' % srv_num)
