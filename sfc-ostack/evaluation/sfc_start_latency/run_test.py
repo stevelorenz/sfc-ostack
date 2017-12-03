@@ -20,11 +20,11 @@ import time
 import paramiko
 from openstack import connection
 
-from sfcostack import conf
+from sfcostack import conf, log
 from sfcostack.sfc import manager
 
 
-def _ssh_cmd(ip, port, user, ssh_key, cmd):
+def _ssh_cmd(ip, port, user, ssh_key, cmd, exit_status=0):
     """Run command multiple times via SSH"""
     ssh_clt = paramiko.SSHClient()
     ssh_clt.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -35,89 +35,71 @@ def _ssh_cmd(ip, port, user, ssh_key, cmd):
         except Exception:
             time.sleep(3)
         else:
-            # print('[DEBUG] Connect to instance succeeded.')
             break
     tran = ssh_clt.get_transport()
-    for i in range(3):
-        channel = tran.open_session()
-        channel.exec_command(cmd)
-        status = channel.recv_exit_status()
-        print('[DEBUG] Command status: %d' % status)
-        time.sleep(3)
-
+    channel = tran.open_session()
+    channel.exec_command(cmd)
+    status = channel.recv_exit_status()
+    if status != exit_status:
+        raise RuntimeError('Run command:%s failed via SSH' % cmd)
     ssh_clt.close()
 
 
-def run_test(method):
+def run_test():
     """Test SFC start and gap time"""
-    print('[TEST] Run test with method: %s' % method)
+
+    sfc_conf = conf.SFCConf()
+    sfc_conf.load_file(CONF_FILE)
+    log.conf_logger(level=sfc_conf.log.level)
+
+    sample_ins = sfc_conf.sample_server.copy()
+
+    sfc_mgr = manager.StaticSFCManager(
+        sfc_conf.auth,
+        mgr_ip=sfc_conf.sfc_mgr_conf.mgr_ip,
+        mgr_port=sfc_conf.sfc_mgr_conf.mgr_port,
+        return_ts=True
+    )
+
+    print('[TEST] Run test with method: %s' % METHOD)
     for srv_num in range(MIN_SF_NUM, MAX_SF_NUM + 1):
-        ts_out_file = '%s-sfc-ts-ins-%d.csv' % (method, srv_num)
+        ts_out_file = '%s-sfc-ts-ins-%d.csv' % (METHOD, srv_num)
         CRT_RUN_GTIMER = RUN_GTIMER
         CRT_RUN_GTIMER += '-o %s ' % ts_out_file
         CRT_RUN_GTIMER += '-l ERROR > /dev/null 2>&1 &'
         print('[DEBUG] Cmd for running GTIMER: %s' % CRT_RUN_GTIMER)
-        # Run timer on the dst instance
+
+        # Run gap timer on the dst instance
         _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, CRT_RUN_GTIMER)
         time.sleep(3)
 
+        print('[DEBUG] Current server number: %d' % srv_num)
+        sfc_conf.server_chain = list()
+        for idx in range(srv_num):
+            sample_ins['name'] = 'sf%d' % idx
+            sfc_conf.server_chain.append([sample_ins.copy()])
+
         print('[DEBUG] Start creating and deleting SFC %d times' % TEST_ROUND)
 
-        # if mode == 0:
-        #     print('[TEST] Run tests in mode 0.')
-        #     # Chain start time stamp
-        #     start_ts_file = 'sfc-ts-ctl-%d.csv' % srv_num
-        #     ctl_ts_lst = list()
-        #     for round_num in range(1, TEST_ROUND + 1 + ADD_ROUND):
-        #         print('[DEBUG] Test round: %d' % round_num)
-        #         time.sleep(3)  # recv some A packets
-        #         srv_chn_start = time.time()
-        #         srv_chain = eva_sfc_mgr.create_sc(srv_num, sf_wait_time=None)
-        #         srv_chn_end = time.time()
-        #         port_chain = eva_sfc_mgr.create_pc(srv_chain)
-        #         port_chn_end = time.time()
-        #         time.sleep(30 * srv_num)  # recv some B packets
-        #         # import ipdb
-        #         # ipdb.set_trace()
-        #         eva_sfc_mgr.delete_pc(port_chain)
-        #         eva_sfc_mgr.delete_sc(srv_chain)
-        #         time.sleep(3)
-        #         ctl_ts_lst.append((srv_chn_start, srv_chn_end, port_chn_end))
+        ctl_ts_file = '%s-sfc-ts-ctl-%d.csv' % (METHOD, srv_num)
+        ctl_ts_lst = list()
 
-        # # TODO(zuo): Remove usage of eva_sfc_mgr
-        # if mode == 1:
-        #     EVA_SERVER = {
-        #         'image': 'ubuntu-cloud',
-        #         'flavor': 'sfc_test',
-        #         'init_script': './init_py_forwarding.sh',
-        #         'ssh': {
-        #             'user_name': 'ubuntu',
-        #             'pub_key_name': 'sfc_test',
-        #             'pvt_key_file': '/home/zuo/sfc_ostack_test/sfc_test.pem'
-        #         }
-        #     }
-        #     print('[TEST] Run tests in mode 1 with SFC StaicManager.')
-        #     sfc_mgr = manager.StaticSFCManager(mgr_ip='192.168.100.1')
-        #     import ipdb
-        #     ipdb.set_trace()
-        #     sfc_conf = conf.SFCConf(eva_sfc_mgr.conf_hd.conf_dict)
-        #     for idx in range(1, srv_num + 1):
-        #         cur_srv = EVA_SERVER.copy()
-        #         cur_srv.update(
-        #             {'name': 'chn%s' % srv_num, }
-        #         )
-        #         sfc_conf.append_srv_grp([cur_srv])
-        #     sfc = sfc_mgr.create_sfc(sfc_conf)
-        #     sfc_mgr.delete_sfc(sfc)
+        for rd in range(1, TEST_ROUND + 1):
+            sfc, time_info = sfc_mgr.create_sfc(sfc_conf, ALLOC_METHOD,
+                                                CHAIN_METHOD, wait_sf_ready=True)
+            ctl_ts_lst.append(time_info)
+            time.sleep(5)
 
-        # with open(start_ts_file, 'w+') as csv_f:
-        #     for ts_tpl in ctl_ts_lst:
-        #         csv_f.write(','.join(map(str, ts_tpl)))
-        #         csv_f.write('\n')
+            sfc_mgr.delete_sfc(sfc)
+
+        with open(ctl_ts_file, 'w+') as csv_f:
+            for ts_tpl in ctl_ts_lst:
+                csv_f.write(','.join(map(str, ts_tpl)))
+                csv_f.write('\n')
 
         # Kill timer on dst instance
-        _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, KILL_CTIMER)
-        time.sleep(3)
+        _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, KILL_GTIMER)
+        time.sleep(5)
 
 
 if __name__ == "__main__":
@@ -139,8 +121,6 @@ if __name__ == "__main__":
 
     ap.add_argument('-r', '--round', type=int, default=1,
                     help='Number of rounds for testing')
-    ap.add_argument('--add_round', type=int, default=1,
-                    help='Additional round for testing')
 
     if len(sys.argv) == 1:
         ap.print_help()
@@ -148,12 +128,15 @@ if __name__ == "__main__":
 
     args = ap.parse_args()
 
+    METHOD = args.method
+    CONF_FILE = args.conf_file
     MIN_SF_NUM = args.min_sf
     MAX_SF_NUM = args.max_sf
+    ALLOC_METHOD = args.alloc_method
+    CHAIN_METHOD = args.chain_method
     DST_ADDR = args.dst_addr
     DST_FIP = args.dst_fip
     TEST_ROUND = args.round
-    ADD_ROUND = args.add_round
     SSH_USER = 'ubuntu'
     PVT_KEY_FILE = args.pvt_key_file
 
@@ -163,7 +146,7 @@ if __name__ == "__main__":
     RUN_GTIMER += '-s %s ' % (DST_ADDR)
     RUN_GTIMER += '-r %s ' % TEST_ROUND
 
-    KILL_CTIMER = "pkill -f 'python3 /home/ubuntu/gap_timer.py'"
+    KILL_GTIMER = "pkill -f 'python3 /home/ubuntu/gap_timer.py'"
 
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
-    run_test(args.mode)
+    run_test()
