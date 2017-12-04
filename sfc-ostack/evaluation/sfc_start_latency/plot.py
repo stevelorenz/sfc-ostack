@@ -18,7 +18,7 @@ Email: xianglinks@gmail.com
 import os
 import sys
 
-# import ipdb
+import ipdb
 import numpy as np
 
 import matplotlib as mpl
@@ -117,7 +117,6 @@ def plot_single_node():
             )
         )
 
-    # ipdb.set_trace()
     # Plot server chain start time
     ax_arr[0].bar(
         x + width / 2.0, [y[0] for y in total_srv_chn_time], width, alpha=0.6,
@@ -168,22 +167,21 @@ def plot_single_node():
     fig_s.savefig('./sfc_start_time.png', dpi=500)
 
 
-def plot_three_compute(inc_wait=True):
+def plot_start_three_compute(inc_wait=True):
     """Plot results on three compute nodes"""
 
-    TEST_ROUND = 10
+    test_round = 10
 
     ##########
     #  Calc  #
     ##########
 
     min_sf_num = 1
-    max_sf_num = 1
+    max_sf_num = 10
 
     result_map = dict()  # key is method
 
-    # method_tuple = ('ns', 'fn', 'nsrd')
-    method_tuple = ('ns', )
+    method_tuple = ('ns', 'fn', 'nsrd')
     ts_info_tuple = (
         'Server instances launch time',
         'Waiting time for SF program',
@@ -201,12 +199,11 @@ def plot_three_compute(inc_wait=True):
 
     for method in method_tuple:
         srv_num_result = list()
-        # for srv_num in range(min_sf_num, max_sf_num + 1):
-        for srv_num in (1, 10):
+        for srv_num in range(min_sf_num, max_sf_num + 1):
             ctl_fn = '%s-sfc-ts-ctl-%d.csv' % (method, srv_num)
             ctl_csvp = os.path.join(base_path, ctl_fn)
             ctl_data = np.genfromtxt(ctl_csvp, delimiter=',')
-            if ctl_data.shape[0] != TEST_ROUND:
+            if ctl_data.shape[0] != test_round:
                 raise RuntimeError(
                     'Number of test rounds is wrong, path: %s' % ctl_csvp
                 )
@@ -225,35 +222,95 @@ def plot_three_compute(inc_wait=True):
     #  Plot  #
     ##########
 
-    colors = [cmap(x * 1 / len(ts_info_tuple))
-              for x in range(len(ts_info_tuple))]
+    method_label_tuple = ('NSD', 'FO', 'NSDRO')
 
     fig, ax = plt.subplots()
-    width = 0.3
+    width = 0.25
 
-    hatch_typ = ['o', '+', '-']
+    hatch_typ = ['/', '+', 'X']
 
     # MARK: I don't know hot to plot this better...
-    import ipdb
     for m_idx, method in enumerate(method_tuple):
         pos = 0 + m_idx * width
         result_lst = result_map[method]
+
+        colors = [cmap(x * 1 / len(ts_info_tuple))
+                  for x in range(len(ts_info_tuple))]
+
+        # TODO: should be plot with list
         for srv_num, ts_tuple in enumerate(result_lst):
             for t_idx, ts in enumerate(ts_tuple):
                 ax.bar(
                     srv_num + 1 + pos, ts_tuple[t_idx], width, alpha=0.6,
                     bottom=sum(ts_tuple[0:t_idx]),
                     color=colors[t_idx], edgecolor=colors[t_idx],
-                    label=ts_info_tuple[t_idx],
+                    label=method_label_tuple[m_idx] +
+                    ", " + ts_info_tuple[t_idx],
                     # hatch=hatch_typ[m_idx]
                 )
 
-    # Add legend for all axis
-    # handles, labels = ax.get_legend_handles_labels()
-    # ax.legend(handles, labels, fontsize=font_size,
-    #           loc='best')
-
     save_fig(fig, './sfc_start_time')
+    fig.show()
+
+
+def plot_gap_three_compute():
+
+    ##########
+    #  Calc  #
+    ##########
+
+    min_sf_num = 1
+    max_sf_num = 10
+
+    result_map = dict()
+    test_round = 10
+    method_tuple = ('ns', 'fn', 'nsrd')
+    base_path = './test_result/three_compute/'
+
+    for method in method_tuple:
+        srv_num_result = list()
+        for srv_num in range(min_sf_num, max_sf_num + 1):
+            ins_fn = '%s-sfc-ts-ins-%d.csv' % (method, srv_num)
+            ins_csvp = os.path.join(base_path, ins_fn)
+            ins_data = np.genfromtxt(ins_csvp, delimiter=',')
+            if ins_data.shape[0] != test_round:
+                raise RuntimeError(
+                    'Number of test rounds is wrong, path: %s' % ins_csvp
+                )
+            else:
+                srv_num_result.append(
+                    np.average(np.subtract(ins_data[:, -2], ins_data[:, -1]))
+                )
+
+        result_map[method] = srv_num_result
+
+    ##########
+    #  Plot  #
+    ##########
+
+    method_label_tuple = ('NSD', 'FO', 'NSDRO')
+
+    fig, ax = plt.subplots()
+    width = 0.25
+
+    colors = [cmap(x * 1 / len(method_tuple)) for x in range(len(method_tuple))]
+
+    for m_idx, method in enumerate(method_tuple):
+        gt_lst = result_map[method]
+        pos = 0 + m_idx * width
+        x = [pos + x for x in range(min_sf_num, max_sf_num + 1)]
+        ax.bar(
+            x, gt_lst, width, alpha=0.6,
+            color=colors[m_idx], edgecolor=colors[m_idx],
+            label=method_label_tuple[m_idx]
+        )
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, fontsize=font_size - 2,
+              loc='best')
+    ax.grid(linestyle='--', lw=0.5)
+
+    save_fig(fig, './sfc_gap_time')
     fig.show()
 
 
@@ -263,11 +320,14 @@ if __name__ == "__main__":
     if sys.argv[1] == '-s':
         plot_single_node()
         plt.show()
-    elif sys.argv[1] == '-mw':
-        plot_three_compute(inc_wait=True)
+    elif sys.argv[1] == '-msw':
+        plot_start_three_compute(inc_wait=True)
         plt.show()
-    elif sys.argv[1] == '-mnw':
-        plot_three_compute(inc_wait=False)
+    elif sys.argv[1] == '-msnw':
+        plot_start_three_compute(inc_wait=False)
+        plt.show()
+    elif sys.argv[1] == '-mg':
+        plot_gap_three_compute()
         plt.show()
     else:
         raise RuntimeError('Hehe...')
