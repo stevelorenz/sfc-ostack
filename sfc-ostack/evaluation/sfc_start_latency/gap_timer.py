@@ -39,7 +39,7 @@ def run_server(addr):
 
     :return sfc_ts_lst (list): A list of time stamps for SFC
     """
-    dup_ck_num = 3
+    dup_b_ck_num = 3
 
     last_apack_ts = '0'  # time stamp for last old payload
     sfc_created = False
@@ -49,7 +49,7 @@ def run_server(addr):
     recv_sock.bind(addr)
     recv_sock.settimeout(None)
 
-    csv_file = open(OUTPUT_FILE, 'a+')
+    csv_file = open(OUTPUT_FILE, 'w+')
 
     def exit_server(*args):
         logger.debug('SIGTERM detected, save all data in the buffer and exit.')
@@ -63,13 +63,14 @@ def run_server(addr):
     signal.signal(signal.SIGTERM, exit_server)
 
     try:
+        dup_b_num = 0
         round_num = 0
         while round_num < TEST_ROUND:
-            dup_num = 0
             pack = recv_sock.recv(RECV_BUFFER_SIZE)
             # SFC is not created
             if pack.startswith(b'a'):
                 sfc_created = False
+                dup_b_num = 0
                 # Update time stamp for last A packet
                 last_apack_ts = str(time.time())
                 # Used for checking time sync status
@@ -80,13 +81,13 @@ def run_server(addr):
                 logger.debug(debug_info)
 
             if pack.startswith(b'b'):
-                dup_num += 1
-                if dup_num == dup_ck_num:
-                    dup_num = 0
+                dup_b_num += 1
+                if dup_b_num >= dup_b_ck_num:
+                    dup_b_num = 0
                     recv_bpack_ts = str(time.time())
                     logger.debug(
                         'TS: %s, Recv %d B packets, last b pack: %s',
-                        recv_bpack_ts, dup_ck_num, pack.decode('ascii')
+                        recv_bpack_ts, dup_b_ck_num, pack.decode('ascii')
                     )
                     if not sfc_created:
                         logger.debug('SFC SHOULD be just created.')
