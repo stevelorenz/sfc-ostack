@@ -87,12 +87,16 @@ def run_test():
         ctl_ts_lst = list()
 
         for rd in range(1, TEST_ROUND + 1):
+            print('[DEBUG] Current round: %d' % rd)
             sfc, time_info = sfc_mgr.create_sfc(sfc_conf, ALLOC_METHOD,
                                                 CHAIN_METHOD, wait_sf_ready=True)
             ctl_ts_lst.append(time_info)
+
             time.sleep(5)
 
             sfc_mgr.delete_sfc(sfc)
+
+            time.sleep(5)
 
         with open(ctl_ts_file, 'w+') as csv_f:
             for ts_tpl in ctl_ts_lst:

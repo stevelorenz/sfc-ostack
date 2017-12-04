@@ -168,7 +168,7 @@ def plot_single_node():
 
 
 def plot_start_three_compute(inc_wait=True):
-    """Plot results on three compute nodes"""
+    """Plot start time results on three compute nodes"""
 
     test_round = 10
 
@@ -183,16 +183,16 @@ def plot_start_three_compute(inc_wait=True):
 
     method_tuple = ('ns', 'fn', 'nsrd')
     ts_info_tuple = (
-        'Server instances launch time',
-        'Waiting time for SF program',
-        'Chain reordering time',
-        'Port Chain building time'
+        'SI launching time',
+        'SFP waiting time',
+        'SFC reordering time',
+        'PC building time'
     )
     if not inc_wait:
         ts_info_tuple = (
-            'Server instances launch time',
-            'Chain reordering time',
-            'Port Chain building time'
+            'SI launching time',
+            'SFP waiting time',
+            'PC building time'
         )
 
     base_path = './test_result/three_compute/'
@@ -222,11 +222,12 @@ def plot_start_three_compute(inc_wait=True):
     #  Plot  #
     ##########
 
-    method_label_tuple = ('NSD', 'FO', 'NSDRO')
+    method_label_tuple = ('N', 'F', 'R')
 
     fig, ax = plt.subplots()
     width = 0.25
 
+    x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
     hatch_typ = ['/', '+', 'X']
 
     # MARK: I don't know hot to plot this better...
@@ -237,23 +238,43 @@ def plot_start_three_compute(inc_wait=True):
         colors = [cmap(x * 1 / len(ts_info_tuple))
                   for x in range(len(ts_info_tuple))]
 
-        # TODO: should be plot with list
+        # MARK: Ugly code...
         for srv_num, ts_tuple in enumerate(result_lst):
             for t_idx, ts in enumerate(ts_tuple):
-                ax.bar(
+                rect = ax.bar(
                     srv_num + 1 + pos, ts_tuple[t_idx], width, alpha=0.6,
                     bottom=sum(ts_tuple[0:t_idx]),
                     color=colors[t_idx], edgecolor=colors[t_idx],
-                    label=method_label_tuple[m_idx] +
-                    ", " + ts_info_tuple[t_idx],
-                    # hatch=hatch_typ[m_idx]
+                    label=ts_info_tuple[t_idx]
                 )
+                if srv_num == 0 and t_idx == (len(ts_tuple) - 1):
+                    autolabel_bar(ax, rect, 150, method_label_tuple[m_idx])
+                # Add legend
+                if method == method_tuple[0] and srv_num == 0:
+                    handles, labels = ax.get_legend_handles_labels()
+                    ax.legend(handles, labels, fontsize=font_size - 2,
+                              loc='best')
 
+    ax.set_xlabel("Number of chained SF-servers",
+                  fontsize=font_size, fontname=font_name)
+    ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
+    ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+    ax.set_ylabel("Start Time (s)", fontsize=font_size, fontname=font_name)
+
+    ax.grid(linestyle='--', lw=0.5)
     save_fig(fig, './sfc_start_time')
     fig.show()
 
 
+def autolabel_bar(ax, rects, height, label):
+    for rect in rects:
+        ax.text(rect.get_x() + rect.get_width() / 2.0, 1.05 * height,
+                label, fontsize=font_size - 3,
+                ha='center', va='bottom')
+
+
 def plot_gap_three_compute():
+    """Plot gap time results on three compute node"""
 
     ##########
     #  Calc  #
@@ -277,8 +298,13 @@ def plot_gap_three_compute():
                 raise RuntimeError(
                     'Number of test rounds is wrong, path: %s' % ins_csvp
                 )
+            if ins_data.shape[1] != srv_num + 4:
+                raise RuntimeError(
+                    'Number of timestamps is wrong, path: %s' % ins_csvp
+                )
             else:
                 srv_num_result.append(
+                    # MARK: first 'b' - last 'a'
                     np.average(np.subtract(ins_data[:, -2], ins_data[:, -1]))
                 )
 
@@ -288,12 +314,15 @@ def plot_gap_three_compute():
     #  Plot  #
     ##########
 
-    method_label_tuple = ('NSD', 'FO', 'NSDRO')
+    method_label_tuple = ('Nova Scheduler Default',
+                          'Fill One',
+                          'NSD Reordered')
 
     fig, ax = plt.subplots()
     width = 0.25
 
-    colors = [cmap(x * 1 / len(method_tuple)) for x in range(len(method_tuple))]
+    colors = [cmap(x * 1 / len(method_tuple))
+              for x in range(len(method_tuple))]
 
     for m_idx, method in enumerate(method_tuple):
         gt_lst = result_map[method]
@@ -308,6 +337,15 @@ def plot_gap_three_compute():
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, fontsize=font_size - 2,
               loc='best')
+
+    ax.set_xlabel("Number of chained SF-servers",
+                  fontsize=font_size, fontname=font_name)
+
+    x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
+    ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
+    ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+    ax.set_ylabel("Gap Time (s)", fontsize=font_size, fontname=font_name)
+
     ax.grid(linestyle='--', lw=0.5)
 
     save_fig(fig, './sfc_gap_time')

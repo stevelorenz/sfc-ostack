@@ -39,8 +39,10 @@ def run_server(addr):
 
     :return sfc_ts_lst (list): A list of time stamps for SFC
     """
-    last_old_pload_ts = '0'  # time stamp for last old payload
-    chn_created = False
+    dup_ck_num = 3
+
+    last_apack_ts = '0'  # time stamp for last old payload
+    sfc_created = False
 
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)
@@ -63,47 +65,51 @@ def run_server(addr):
     try:
         round_num = 0
         while round_num < TEST_ROUND:
+            dup_num = 0
             pack = recv_sock.recv(RECV_BUFFER_SIZE)
             # SFC is not created
             if pack.startswith(b'a'):
-                chn_created = False
-                # Update time stamp for old payload
-                last_old_pload_ts = str(time.time())
+                sfc_created = False
+                # Update time stamp for last A packet
+                last_apack_ts = str(time.time())
                 # Used for checking time sync status
                 debug_info = (
-                    'TS: %s, Recv a A packet: %s. last a pack ts: %s'
-                    % (time.time(), pack.decode('ascii'), last_old_pload_ts)
+                    'TS: %s, Recv a A packet: %s. last A pack ts: %s'
+                    % (time.time(), pack.decode('ascii'), last_apack_ts)
                 )
                 logger.debug(debug_info)
 
             if pack.startswith(b'b'):
-                recv_bpack_ts = str(time.time())
-                logger.debug(
-                    'TS: %s, Recv a B packet: %s' % (recv_bpack_ts,
-                                                     pack.decode('ascii'))
-                )
-                if not chn_created:
-                    logger.debug('SFC should be just created.')
-                    chn_created = True
-                    round_num += 1
-                    # Total SFC creation delay
-                    # Unpack time stamp data in the payload
-                    ts_str = pack.decode('ascii')
-                    logger.debug('Time stamp str before strip: %s' % ts_str)
-                    # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
-                    # First element: bbb...
-                    ts_lst = ts_str.split(',')[1:]
-                    ts_lst.append(recv_bpack_ts)  # first b
-                    ts_lst.append(last_old_pload_ts)  # last a
-                    try:
-                        csv_file.write(','.join(ts_lst))
-                        csv_file.write('\n')
-                    except ValueError:
-                        csv_file.close()
-                        sys.exit(0)
-                else:
-                    logger.debug('SFC is already created.')
-                    logger.debug('Payload: %s' % pack.decode('ascii'))
+                dup_num += 1
+                if dup_num == dup_ck_num:
+                    dup_num = 0
+                    recv_bpack_ts = str(time.time())
+                    logger.debug(
+                        'TS: %s, Recv %d B packets, last b pack: %s',
+                        recv_bpack_ts, dup_ck_num, pack.decode('ascii')
+                    )
+                    if not sfc_created:
+                        logger.debug('SFC SHOULD be just created.')
+                        sfc_created = True
+                        round_num += 1
+                        # Total SFC creation delay
+                        # Unpack time stamp data in the payload
+                        ts_str = pack.decode('ascii')
+                        logger.debug('Time stamp str before strip: %s' % ts_str)
+                        # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
+                        # First element: bbb...
+                        ts_lst = ts_str.split(',')[1:]
+                        ts_lst.append(recv_bpack_ts)  # first b
+                        ts_lst.append(last_apack_ts)  # last a
+                        try:
+                            csv_file.write(','.join(ts_lst))
+                            csv_file.write('\n')
+                        except ValueError:
+                            csv_file.close()
+                            sys.exit(0)
+                    else:
+                        logger.debug('SFC is ALREADY created.')
+                        # logger.debug('Payload: %s' % pack.decode('ascii'))
     except KeyboardInterrupt:
         logger.info('KeyboardInterrupt')
         csv_file.close()
@@ -116,6 +122,8 @@ def run_client(addr):
     MARK: The accuracy of the time.sleep() depends on the underlying OS
     The OS usually ONLY support millisecond sleeps
     """
+
+    MAX_PACK_NUM = 65530  # max unsigned int 65535, 4 bytes
 
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -135,6 +143,9 @@ def run_client(addr):
         logger.debug('Send payload: %s' % payload)
         send_sock.sendto(payload.encode('ascii'), addr)
         pack_num += 1
+        # MARK: Python extends int to arbitary length until the mem is full
+        if pack_num > MAX_PACK_NUM:
+            pack_num = 0
         time.sleep(SEND_INTERVAL)
 
 

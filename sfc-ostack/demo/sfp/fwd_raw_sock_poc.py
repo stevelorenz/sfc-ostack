@@ -83,7 +83,8 @@ def fw_recv_pack(in_iface, out_iface):
 
     logger.info('Bind forwards recv socket to ingress interface: %s' % in_iface)
     recv_sock.bind((in_iface, 0))
-    logger.info('Bind forwards send socket to egress interface: %s' % out_iface)
+    logger.info('Bind forwards send socket to egress interface: %s' %
+                out_iface)
     send_sock.bind((out_iface, 0))
 
     recv_num = 0
