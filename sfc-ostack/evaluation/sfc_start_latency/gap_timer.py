@@ -96,7 +96,8 @@ def run_server(addr):
                         # Total SFC creation delay
                         # Unpack time stamp data in the payload
                         ts_str = pack.decode('ascii')
-                        logger.debug('Time stamp str before strip: %s' % ts_str)
+                        logger.debug(
+                            'Time stamp str before strip: %s' % ts_str)
                         # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
                         # First element: bbb...
                         ts_lst = ts_str.split(',')[1:]

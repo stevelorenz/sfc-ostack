@@ -185,13 +185,13 @@ def plot_start_three_compute(inc_wait=True):
     ts_info_tuple = (
         'SI launching time',
         'SFP waiting time',
-        'SFC reordering time',
+        'SI reordering time',
         'PC building time'
     )
     if not inc_wait:
         ts_info_tuple = (
             'SI launching time',
-            'SFP waiting time',
+            'SI reordering time',
             'PC building time'
         )
 
@@ -203,7 +203,7 @@ def plot_start_three_compute(inc_wait=True):
             ctl_fn = '%s-sfc-ts-ctl-%d.csv' % (method, srv_num)
             ctl_csvp = os.path.join(base_path, ctl_fn)
             ctl_data = np.genfromtxt(ctl_csvp, delimiter=',')
-            if ctl_data.shape[0] != test_round:
+            if ctl_data.shape[0] < test_round:
                 raise RuntimeError(
                     'Number of test rounds is wrong, path: %s' % ctl_csvp
                 )
@@ -225,16 +225,28 @@ def plot_start_three_compute(inc_wait=True):
     method_label_tuple = ('N', 'F', 'R')
 
     fig, ax = plt.subplots()
+    # ax_ex = ax.twiny()
+
+    # Add some extra space for the second axis at the bottom
+    # fig.subplots_adjust(bottom=0.2)
+    # Move twinned axis ticks and label from top to bottom
+    # ax_ex.xaxis.set_ticks_position("bottom")
+    # ax_ex.xaxis.set_label_position("bottom")
+
+    # Offset the twin axis below the host
+    # ax_ex.spines["bottom"].set_position(("axes", -0.08))
+
     width = 0.25
 
     x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
-    hatch_typ = ['/', '+', 'X']
+    hatch_typ = [' ', '/', '\\']
 
     # MARK: I don't know hot to plot this better...
     for m_idx, method in enumerate(method_tuple):
         pos = 0 + m_idx * width
         result_lst = result_map[method]
 
+        cmap = cm.get_cmap('Set2')
         colors = [cmap(x * 1 / len(ts_info_tuple))
                   for x in range(len(ts_info_tuple))]
 
@@ -242,12 +254,13 @@ def plot_start_three_compute(inc_wait=True):
         for srv_num, ts_tuple in enumerate(result_lst):
             for t_idx, ts in enumerate(ts_tuple):
                 rect = ax.bar(
-                    srv_num + 1 + pos, ts_tuple[t_idx], width, alpha=0.6,
-                    bottom=sum(ts_tuple[0:t_idx]),
-                    color=colors[t_idx], edgecolor=colors[t_idx],
-                    label=ts_info_tuple[t_idx]
+                    srv_num + 1 + pos, ts_tuple[t_idx], width, alpha=0.8,
+                    bottom=sum(ts_tuple[0:t_idx]), lw=0.8,
+                    color=colors[t_idx], edgecolor='black',
+                    label=ts_info_tuple[t_idx],
                 )
                 if srv_num == 0 and t_idx == (len(ts_tuple) - 1):
+                    pass
                     autolabel_bar(ax, rect, 150, method_label_tuple[m_idx])
                 # Add legend
                 if method == method_tuple[0] and srv_num == 0:
@@ -259,9 +272,16 @@ def plot_start_three_compute(inc_wait=True):
                   fontsize=font_size, fontname=font_name)
     ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+
+    # ax_ex.set_xticks(x - width)
+    # ax_ex.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+    # ax_ex.set_xlabel("Number of chained SF-servers",
+    # fontsize=font_size, fontname=font_name)
+
     ax.set_ylabel("Start Time (s)", fontsize=font_size, fontname=font_name)
 
-    ax.grid(linestyle='--', lw=0.5)
+    # ax.grid(linestyle='--', lw=0.5)
+    ax.yaxis.grid(which='major', lw=0.5, ls='--')
     save_fig(fig, './sfc_start_time')
     fig.show()
 
@@ -269,8 +289,29 @@ def plot_start_three_compute(inc_wait=True):
 def autolabel_bar(ax, rects, height, label):
     for rect in rects:
         ax.text(rect.get_x() + rect.get_width() / 2.0, 1.05 * height,
-                label, fontsize=font_size - 3,
+                label, fontsize=font_size - 2,
                 ha='center', va='bottom')
+
+
+def _filter_outlier_gap(ins_data_arr):
+    """Filter out outliers in gap time tests
+
+    MARK: The problem is that, when SFC is deleted, the flow classifier is
+    deleted firstly. Then no-chained packets come from the source very fast.
+    Then there is still some delayed chained packets com from the old chain
+    path, this could be seen as a wrong chain creation round.
+    """
+
+    MIN_SFC_START_TIME = 100  # second, got from start time tests
+
+    del_row_idx = list()
+    last_send_ts = ins_data_arr[0, 1]
+    for idx, row in enumerate(ins_data_arr[1:, :]):
+        if np.abs(row[1] - last_send_ts) < MIN_SFC_START_TIME:
+            del_row_idx.append(idx + 1)
+        last_send_ts = row[1]
+    # print(del_row_idx)
+    return np.delete(ins_data_arr, del_row_idx, axis=0)
 
 
 def plot_gap_three_compute():
@@ -294,7 +335,7 @@ def plot_gap_three_compute():
             ins_fn = '%s-sfc-ts-ins-%d.csv' % (method, srv_num)
             ins_csvp = os.path.join(base_path, ins_fn)
             ins_data = np.genfromtxt(ins_csvp, delimiter=',')
-            if ins_data.shape[0] != test_round:
+            if ins_data.shape[0] < test_round:
                 raise RuntimeError(
                     'Number of test rounds is wrong, path: %s' % ins_csvp
                 )
@@ -303,6 +344,12 @@ def plot_gap_three_compute():
                     'Number of timestamps is wrong, path: %s' % ins_csvp
                 )
             else:
+                if method == 'ns' and srv_num == 2:
+                    pass
+                ins_data = _filter_outlier_gap(ins_data)
+                print('[DEBUG] Method: %s, srv_num : %d after filter: %d' % (
+                    method, srv_num,
+                    ins_data.shape[0]))
                 srv_num_result.append(
                     # MARK: first 'b' - last 'a'
                     np.average(np.subtract(ins_data[:, -2], ins_data[:, -1]))
