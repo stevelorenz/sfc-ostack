@@ -37,12 +37,11 @@ def run_server(addr):
     - The client send packet(payload) with first byte b'a' - old payload
     - The SFs in the chain modify the first byte to b'b' - new payload
 
-    :return sfc_ts_lst (list): A list of time stamps for SFC
     """
-    dup_b_ck_num = 3
 
-    last_apack_ts = '0'  # time stamp for last old payload
+    last_apack_ts = 0  # time stamp for last A packet
     sfc_created = False
+    last_sfc_created_ts = 0
 
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)
@@ -63,55 +62,54 @@ def run_server(addr):
     signal.signal(signal.SIGTERM, exit_server)
 
     try:
-        dup_b_num = 0
         round_num = 0
         while round_num < TEST_ROUND:
             pack = recv_sock.recv(RECV_BUFFER_SIZE)
+            recv_ts = time.time()
+            pack_pl_str = pack.decode('ascii')
+
             # SFC is not created
             if pack.startswith(b'a'):
                 sfc_created = False
-                dup_b_num = 0
                 # Update time stamp for last A packet
-                last_apack_ts = str(time.time())
+                last_apack_ts = time.time()
                 # Used for checking time sync status
-                debug_info = (
-                    'TS: %s, Recv a A packet: %s. last A pack ts: %s'
-                    % (time.time(), pack.decode('ascii'), last_apack_ts)
+                logger.debug(
+                    'Recv a A packet, payload: %s, last A pack ts: %s',
+                    pack_pl_str, str(last_apack_ts)
                 )
-                logger.debug(debug_info)
 
             if pack.startswith(b'b'):
-                dup_b_num += 1
-                if dup_b_num >= dup_b_ck_num:
-                    dup_b_num = 0
-                    recv_bpack_ts = str(time.time())
-                    logger.debug(
-                        'TS: %s, Recv %d B packets, last b pack: %s',
-                        recv_bpack_ts, dup_b_ck_num, pack.decode('ascii')
-                    )
-                    if not sfc_created:
-                        logger.debug('SFC SHOULD be just created.')
-                        sfc_created = True
-                        round_num += 1
-                        # Total SFC creation delay
-                        # Unpack time stamp data in the payload
-                        ts_str = pack.decode('ascii')
+                if not sfc_created:
+                    # This is a delayed old B packet
+                    if recv_ts - last_sfc_created_ts <= MIN_START_TIME:
                         logger.debug(
-                            'Time stamp str before strip: %s' % ts_str)
-                        # SF1_recv_ts, SF1_send_ts, SF2_recv_ts, SF2_send_ts
-                        # First element: bbb...
-                        ts_lst = ts_str.split(',')[1:]
-                        ts_lst.append(recv_bpack_ts)  # first b
-                        ts_lst.append(last_apack_ts)  # last a
-                        try:
-                            csv_file.write(','.join(ts_lst))
-                            csv_file.write('\n')
-                        except ValueError:
-                            csv_file.close()
-                            sys.exit(0)
-                    else:
-                        logger.debug('SFC is ALREADY created.')
-                        # logger.debug('Payload: %s' % pack.decode('ascii'))
+                            'Recv a delayed B packet, payload: %s, last A pack ts: %s',
+                            pack_pl_str, str(last_apack_ts)
+                        )
+                        continue
+
+                    last_sfc_created_ts = recv_ts
+                    sfc_created = True
+                    logger.debug(
+                        'SFC SHOULD be just created. last create ts: %s',
+                        str(last_sfc_created_ts)
+                    )
+                    round_num += 1
+                    # Remove first element b'bbb'
+                    b_pload_lst = pack_pl_str.split(',')[1:]
+                    b_pload_lst.append(str(recv_ts))  # first b
+                    b_pload_lst.append(str(last_apack_ts))  # last a
+                    try:
+                        csv_file.write(','.join(b_pload_lst))
+                        csv_file.write('\n')
+                    except ValueError:
+                        csv_file.close()
+                        sys.exit(0)
+                else:
+                    logger.debug('SFC is ALREADY created.')
+                    logger.debug('Payload: %s' % pack.decode('ascii'))
+
     except KeyboardInterrupt:
         logger.info('KeyboardInterrupt')
         csv_file.close()
@@ -164,6 +162,8 @@ if __name__ == "__main__":
                         help='Number of test rounds')
     parser.add_argument('-o', '--output_file', type=str, default='chn_ct.csv',
                         help='Output file of test result')
+    parser.add_argument('--min_start_time', type=int, default=100,
+                        help='Minimal SFC start time in second, default 100s')
 
     group.add_argument('-c', '--client', metavar='Address', type=str,
                        help='Run in UDP client mode')
@@ -195,7 +195,9 @@ if __name__ == "__main__":
         addr = (ip, int(port))
         TEST_ROUND = args.round
         OUTPUT_FILE = args.output_file
-        logger.info('Run UDP server on %s:%s.' % (ip, port))
+        MIN_START_TIME = args.min_start_time
+        logger.info('Run UDP server on %s:%s. Minimal SFC start time: %d sec' % (
+            ip, port, MIN_START_TIME))
         run_server(addr)
 
     if args.client:
