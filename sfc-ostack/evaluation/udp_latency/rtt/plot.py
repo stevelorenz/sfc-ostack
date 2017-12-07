@@ -180,7 +180,7 @@ def plot_ipd():
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
     ax.set_ylim(0, 14)
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=font_size - 1,
+    ax.legend(handles, labels, fontsize=font_size,
               loc='upper right')
     ax.grid(linestyle='--', lw=0.5)
 
@@ -270,9 +270,10 @@ def plot_plen():
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
     ax.set_ylim(0, 12)
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=font_size - 1,
+    ax.legend(handles, labels, fontsize=font_size,
               loc='upper right')
-    ax.grid(linestyle='--', lw=0.5)
+    # ax.grid(linestyle='--', lw=0.5)
+    ax.yaxis.grid(which='major', lw=0.5, ls='--')
 
     save_fig(fig, './plen_three_compute')
     fig.show()
@@ -374,7 +375,7 @@ def plot_single_host():
         ax.bar(x + pos, y, width=width,
                label=label, color=color)
 
-    ax.set_xlabel("Number of chained SF-servers",
+    ax.set_xlabel("Number of chained SFIs",
                   fontsize=font_size, fontname=font_name)
     ax.set_xticks(x + width / 2.0)
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
@@ -411,7 +412,7 @@ def plot_single_host():
         # ax1.bar(x + pos, y, width=width,
         # label=label, color=color)
 
-    ax1.set_xlabel("Number of chained SF-servers",
+    ax1.set_xlabel("Number of chained SFIs",
                    fontsize=font_size, fontname=font_name)
     ax1.set_xticks(x + width / 2.0)
     ax1.set_xticklabels(x, fontsize=font_size, fontname=font_name)
@@ -531,16 +532,17 @@ def plot_three_host():
 
         # ax.plot(x + pos, y, color=color, lw=1, ls='--')
 
-    ax.set_xlabel("Number of chained SF-servers",
+    ax.set_xlabel("Number of chained SFIs",
                   fontsize=font_size, fontname=font_name)
     ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
     ax.set_ylim(4, 9)
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=font_size - 2,
+    ax.legend(handles, labels, fontsize=font_size,
               loc='upper left')
-    ax.grid(linestyle='--', lw=0.5)
+    # ax.grid(linestyle='--', lw=0.5)
+    ax.yaxis.grid(which='major', lw=0.5, ls='--')
 
     save_fig(fig, './udp_rtt_three_compute')
     fig.show()
@@ -566,7 +568,7 @@ def plot_three_host():
     #     # ax1.bar(x + pos, y, width=width,
     #     # label=label, color=color)
 
-    # ax1.set_xlabel("Number of chained SF-servers",
+    # ax1.set_xlabel("Number of chained SFIs",
     #                fontsize=font_size, fontname=font_name)
     # ax1.set_xticks(x + width / 2.0)
     # ax1.set_xticklabels(x, fontsize=font_size, fontname=font_name)

@@ -23,14 +23,15 @@ import numpy as np
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from matplotlib.pyplot import cm
 
 # Shared font config
-font_size = 9
+font_size = 8
 font_name = 'monospace'
 mpl.rc('font', family=font_name)
 
-# Maximal number of SF servers in the chain
+# Maximal number of SF instances in the chain
 MAX_CHN_NUM = 8
 TEST_ROUND = 30
 
@@ -183,15 +184,15 @@ def plot_start_three_compute(inc_wait=True):
 
     method_tuple = ('ns', 'fn', 'nsrd')
     ts_info_tuple = (
-        'SI launching time',
+        'SFI launching time',
         'SFP waiting time',
-        'SI reordering time',
+        'SFI reordering time',
         'PC building time'
     )
     if not inc_wait:
         ts_info_tuple = (
-            'SI launching time',
-            'SI reordering time',
+            'SFI launching time',
+            'SFI reordering time',
             'PC building time'
         )
 
@@ -225,21 +226,15 @@ def plot_start_three_compute(inc_wait=True):
     method_label_tuple = ('N', 'F', 'R')
 
     fig, ax = plt.subplots()
-    # ax_ex = ax.twiny()
 
     # Add some extra space for the second axis at the bottom
     # fig.subplots_adjust(bottom=0.2)
     # Move twinned axis ticks and label from top to bottom
-    # ax_ex.xaxis.set_ticks_position("bottom")
-    # ax_ex.xaxis.set_label_position("bottom")
-
-    # Offset the twin axis below the host
-    # ax_ex.spines["bottom"].set_position(("axes", -0.08))
 
     width = 0.25
 
     x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
-    hatch_typ = [' ', '/', '\\']
+    hatch_typ = [' ', '/', '.']
 
     # MARK: I don't know hot to plot this better...
     for m_idx, method in enumerate(method_tuple):
@@ -258,25 +253,31 @@ def plot_start_three_compute(inc_wait=True):
                     bottom=sum(ts_tuple[0:t_idx]), lw=0.8,
                     color=colors[t_idx], edgecolor='black',
                     label=ts_info_tuple[t_idx],
+                    # hatch=hatch_typ[m_idx]
                 )
-                if srv_num == 0 and t_idx == (len(ts_tuple) - 1):
-                    pass
-                    autolabel_bar(ax, rect, 150, method_label_tuple[m_idx])
+                if t_idx == (len(ts_tuple) - 1):
+                    autolabel_bar(ax, rect, -10, method_label_tuple[m_idx])
                 # Add legend
                 if method == method_tuple[0] and srv_num == 0:
                     handles, labels = ax.get_legend_handles_labels()
-                    ax.legend(handles, labels, fontsize=font_size - 2,
+                    ax.legend(handles, labels, fontsize=font_size,
                               loc='best')
 
-    ax.set_xlabel("Number of chained SF-servers",
+    ax.set_xlabel("Number of chained SFIs",
                   fontsize=font_size, fontname=font_name)
+
+    ax.axhline(y=-0.005, color='black', linestyle='-', lw=1)
+    # ax.text(0.5, -0.03, 'SFC creation method',
+    # verticalalignment='bottom', horizontalalignment='center',
+    # transform=ax.transAxes,
+    # color='black', fontsize=font_size)
+
+    ax.spines["bottom"].set_position(("axes", -0.005))
+    ax.tick_params(axis='x', which='both', length=0)
+    ax.spines["bottom"].set_visible(False)
     ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
-
-    # ax_ex.set_xticks(x - width)
-    # ax_ex.set_xticklabels(x, fontsize=font_size, fontname=font_name)
-    # ax_ex.set_xlabel("Number of chained SF-servers",
-    # fontsize=font_size, fontname=font_name)
+    # ax.set_xlim(0, 11)
 
     ax.set_ylabel("Start Time (s)", fontsize=font_size, fontname=font_name)
 
@@ -376,16 +377,16 @@ def plot_gap_three_compute():
         pos = 0 + m_idx * width
         x = [pos + x for x in range(min_sf_num, max_sf_num + 1)]
         ax.bar(
-            x, gt_lst, width, alpha=0.6,
+            x, gt_lst, width, alpha=0.8,
             color=colors[m_idx], edgecolor=colors[m_idx],
             label=method_label_tuple[m_idx]
         )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=font_size - 2,
+    ax.legend(handles, labels, fontsize=font_size,
               loc='best')
 
-    ax.set_xlabel("Number of chained SF-servers",
+    ax.set_xlabel("Number of chained SFIs",
                   fontsize=font_size, fontname=font_name)
 
     x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
@@ -393,7 +394,7 @@ def plot_gap_three_compute():
     ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
     ax.set_ylabel("Gap Time (s)", fontsize=font_size, fontname=font_name)
 
-    ax.grid(linestyle='--', lw=0.5)
+    ax.yaxis.grid(which='major', lw=0.5, ls='--')
 
     save_fig(fig, './sfc_gap_time')
     fig.show()
