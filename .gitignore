@@ -11,7 +11,10 @@
 ############
 
 *.png
-sfc-ostack/evaluation/udp_latency/*.pdf
+*.svg
+
+sfc-ostack/evaluation/udp_latency/rtt/*.pdf
+sfc-ostack/evaluation/udp_latency/one_way/*.pdf
 sfc-ostack/evaluation/sfc_start_latency/*.pdf
 
 ###################

@@ -1,12 +1,12 @@
 # SFC-Ostack: A Simple Research Framework for SFC on OpenStack #
 
-> This project is used for service function chaining in OpenStack, done by Zuo.
+SFC-Ostack focus currently on efficient cloud resource allocation and Service Function Instance (SFI) chaining.
 
 ## Catalog ##
 
-- [sfc-ostack](./sfc-ostack/README.md): Source code, evolutions and demos of sfc-ostack framework.
+- [sfc-ostack](./sfc-ostack/): Source code, demos and evaluations of sfc-ostack framework.
 
-- [up_stack](./up_stack/README.md): Scripts for "playing" with OpenStack on multiple nodes.
+- [up_stack](./up_stack/): Scripts and docs for "playing" with OpenStack.
 
 ## Maintainer ##
 
