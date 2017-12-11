@@ -14,6 +14,7 @@ import binascii
 import logging
 import multiprocessing
 import socket
+import struct
 import sys
 
 ############
@@ -78,8 +79,12 @@ def forwards_forward(recv_sock, send_sock):
 
     while True:
         pack_len = recv_sock.recv_into(pack_arr, BUFFER_SIZE)
-        pack_arr[0:MAC_LEN] = DST_MAC_B
-        send_sock.send(pack_arr[0:pack_len])
+
+        eth_typ = struct.unpack('>H', pack_arr[12:14])[0]
+        # Only forward IPv4 packet
+        if eth_typ == 2048:
+            pack_arr[0:MAC_LEN] = DST_MAC_B
+            send_sock.send(pack_arr[0:pack_len])
 
 
 def backwards_forward(recv_sock, send_sock):
@@ -94,8 +99,11 @@ def backwards_forward(recv_sock, send_sock):
         if cur_dst_mac_b == DST_MAC_B:
             continue
         else:
-            pack_arr[0:MAC_LEN] = SRC_MAC_B
-            send_sock.send(pack_arr[0:pack_len])
+            eth_typ = struct.unpack('>H', pack_arr[12:14])[0]
+            # Only forward IPv4 packet
+            if eth_typ == 2048:
+                pack_arr[0:MAC_LEN] = SRC_MAC_B
+                send_sock.send(pack_arr[0:pack_len])
 
 
 if __name__ == "__main__":

@@ -99,7 +99,7 @@ def run_test():
                      exit_status=0)
 
             # Run UDP client on src instance
-            test_cmd = RUN_TIMER_CLT + '--n_packets %s' % N_PACKETS
+            test_cmd = RUN_TIMER_CLT + '--n_packets %s' % (N_PACKETS + 5)
             stdin, stdout, stderr = src_ssh_clt.exec_command(test_cmd)
             print(stdout.read().decode())
             time.sleep(3)
@@ -164,8 +164,8 @@ if __name__ == "__main__":
     RUN_TIMER_CLT = ''
     RUN_TIMER_CLT += 'python3 /home/ubuntu/owd_timer.py -l ERROR '
     RUN_TIMER_CLT += '-c %s ' % (DST_ADDR)
-    # RUN_TIMER_CLT += '-n %s ' % (N_PACKETS)
-    RUN_TIMER_CLT += '--send_interval 0.1'
+    # 5 ms come from rtt tests
+    RUN_TIMER_CLT += '--send_interval 0.005 '
 
     print('[DEBUG] Dst addr: %s, Dst floating IP:%s' % (DST_ADDR, DST_FIP))
     run_test()

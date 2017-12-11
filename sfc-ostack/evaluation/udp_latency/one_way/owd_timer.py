@@ -10,7 +10,10 @@ Email: xianglinks@gmail.com
 
 import argparse
 import logging
+import os
+import signal
 import socket
+import sys
 import time
 
 
@@ -41,6 +44,17 @@ def run_server():
 
     csv_file = open(OUTPUT_FILE, 'a+')
 
+    def exit_server(*args):
+        logger.debug('SIGTERM detected, save all data in the buffer and exit.')
+        recv_sock.close()
+        # Sync buffered data to the disk
+        csv_file.flush()
+        os.fsync(csv_file.fileno())
+        csv_file.close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, exit_server)
+
     pack_idx, recv_num = 0, 0
 
     try:
@@ -64,6 +78,10 @@ def run_server():
         )
         csv_file.write('\n')
     except Exception as e:
+        csv_file.write(
+            ','.join(map(str, owd_result))
+        )
+        csv_file.write('\n')
         raise e
     finally:
         recv_sock.close()
@@ -109,7 +127,7 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     logging.basicConfig(level=args.log_level,
-                        handlers=logging.StreamHandler,
+                        handlers=[logging.StreamHandler()],
                         format=fmt_str)
 
     N_PACKETS = args.n_packets
