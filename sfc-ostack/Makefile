@@ -17,7 +17,7 @@ TMP_ALL = $(TMP_PY) $(BUILT_PY)
 
 
 all:
-	@echo "Makefile needs your attention"
+	@echo "Makefile macht Kinder froh, und mich ebenso."
 
 lint-all:
 	@echo "Lint all python src with flake8..."
@@ -69,6 +69,10 @@ clean-tmp:
 	@echo "Run generall cleanups..."
 	@rm -rf $(TMP_ALL)
 
+################
+#  Virtualenv  #
+################
+
 save-pkgs:
 	@echo "Save installed pip packages in $(PIP_REQUIREMENTS)"
 	pip freeze > $(PIP_REQUIREMENTS)
@@ -88,5 +92,13 @@ install-all-pkgs-dev:
 uninstall-all-pkgs:
 	@echo "Uninstall all pip packages..."
 	pip freeze | xargs pip uninstall -y
+
+############
+#  Docker  #
+############
+
+build-docker-img:
+	@echo "Build Docker image for dev-env"
+	docker build -t sfcostack_dev .
 
 # vim:ft=make

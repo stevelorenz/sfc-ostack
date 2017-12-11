@@ -171,7 +171,7 @@ def plot_single_node():
 def plot_start_three_compute(inc_wait=True):
     """Plot start time results on three compute nodes"""
 
-    test_round = 10
+    test_round = 30
 
     ##########
     #  Calc  #
@@ -208,6 +208,7 @@ def plot_start_three_compute(inc_wait=True):
                 raise RuntimeError(
                     'Number of test rounds is wrong, path: %s' % ctl_csvp
                 )
+            ctl_data = ctl_data[:test_round, :]
             if not inc_wait:
                 srv_num_result.append(
                     [np.average(ctl_data[:, x]) for x in (0, 2, 3)]
@@ -326,7 +327,7 @@ def plot_gap_three_compute():
     max_sf_num = 10
 
     result_map = dict()
-    test_round = 10
+    test_round = 30
     method_tuple = ('ns', 'fn', 'nsrd')
     base_path = './test_result/three_compute/'
 
@@ -345,9 +346,8 @@ def plot_gap_three_compute():
                     'Number of timestamps is wrong, path: %s' % ins_csvp
                 )
             else:
-                if method == 'ns' and srv_num == 2:
-                    pass
                 ins_data = _filter_outlier_gap(ins_data)
+                ins_data = ins_data[:test_round, :]
                 print('[DEBUG] Method: %s, srv_num : %d after filter: %d' % (
                     method, srv_num,
                     ins_data.shape[0]))

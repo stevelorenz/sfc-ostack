@@ -525,7 +525,7 @@ def plot_three_host():
         y = lat_avg_map[method]
 
         rect = ax.bar(x + pos, y, width=width, yerr=lat_hwci_map[method],
-                      label=label, color=color,
+                      label=label, color=color, edgecolor=color,
                       error_kw=dict(elinewidth=1, ecolor='red'))
 
         # autolabel_bar(ax, rect)
