@@ -69,7 +69,7 @@ def run_test():
         out_file = '%s-owd-%d.csv' % (METHOD, srv_num)
         CRT_RUN_TIMER_SRV = RUN_TIMER_SRV
         CRT_RUN_TIMER_SRV += '-o %s ' % out_file
-        CRT_RUN_TIMER_SRV += '-l ERROR > /dev/null 2>&1 &'
+        CRT_RUN_TIMER_SRV += '> /dev/null 2>&1 &'
         print('[DEBUG] Cmd for running RUN_TIMER_SRV: %s' % CRT_RUN_TIMER_SRV)
 
         print('[DEBUG] Current server number: %d' % srv_num)
@@ -84,32 +84,32 @@ def run_test():
             print('[DEBUG] Current round: %d' % rd)
             sfc, _ = sfc_mgr.create_sfc(sfc_conf, ALLOC_METHOD,
                                         CHAIN_METHOD, wait_sf_ready=True)
-            time.sleep(3)
+            time.sleep(6)
 
             # Run warm up
-            warm_up_cmd = RUN_TIMER_CLT + '--n_packets 50'
-            for warm_rd in range(2):
-                print('Run warm up!')
-                stdin, stdout, stderr = src_ssh_clt.exec_command(warm_up_cmd)
-                print(stdout.read().decode())
-            time.sleep(3)
+            # warm_up_cmd = RUN_TIMER_CLT + '--n_packets 50'
+            # for warm_rd in range(2):
+            #     print('Run warm up!')
+            #     stdin, stdout, stderr = src_ssh_clt.exec_command(warm_up_cmd)
+            #     print(stdout.read().decode())
+            # time.sleep(3)
 
             # Run UDP server on dst instance
-            _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, CRT_RUN_TIMER_SRV,
-                     exit_status=0)
+            # _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, CRT_RUN_TIMER_SRV,
+            # exit_status=0)
 
             # Run UDP client on src instance
             test_cmd = RUN_TIMER_CLT + '--n_packets %s' % (N_PACKETS + 5)
             stdin, stdout, stderr = src_ssh_clt.exec_command(test_cmd)
             print(stdout.read().decode())
-            time.sleep(3)
+            time.sleep(6)
 
             # Kill timer on dst instance
-            _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, KILL_TIMER_SRV)
-            time.sleep(3)
+            # _ssh_cmd(DST_FIP, 22, SSH_USER, PVT_KEY_FILE, KILL_TIMER_SRV)
+            # time.sleep(3)
 
             sfc_mgr.delete_sfc(sfc)
-            time.sleep(5)
+            time.sleep(6)
 
 
 if __name__ == "__main__":

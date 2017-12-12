@@ -55,37 +55,39 @@ def run_server():
 
     signal.signal(signal.SIGTERM, exit_server)
 
-    pack_idx, recv_num = 0, 0
+    for rd in range(1, ROUND + 1):
+        pack_idx, recv_num = 0, 0
+        try:
+            logger.info('Current test round: %d' % rd)
+            owd_result = list()
+            while recv_num < N_PACKETS:
+                pack = recv_sock.recv(SRV_BUFFER_SIZE)
+                recv_ts = time.time()
+                cur_idx, send_ts = pack.decode('ascii').split(',')[:2]
+                cur_idx = int(cur_idx)
+                if cur_idx != pack_idx:
+                    raise RuntimeError(
+                        'Packet order is not right! cur_idx: %d, pack_idx: %d' % (
+                            cur_idx, pack_idx)
+                    )
+                send_ts = float(send_ts)
+                logger.debug('Recv a pack, idx:%s, send_ts:%s',
+                             cur_idx, send_ts)
+                owd = recv_ts - send_ts  # in second
+                owd_result.append(owd)
+                pack_idx += 1
+                recv_num += 1
+            csv_file.write(
+                ','.join(map(str, owd_result))
+            )
+            csv_file.write('\n')
+        except Exception as e:
+            csv_file.write(str(e))
+            csv_file.write('\n')
+            continue
 
-    try:
-        owd_result = list()
-        while recv_num < N_PACKETS:
-            pack = recv_sock.recv(SRV_BUFFER_SIZE)
-            recv_ts = time.time()
-            cur_idx, send_ts = pack.decode('ascii').split(',')[:2]
-            cur_idx = int(cur_idx)
-            if cur_idx != pack_idx:
-                raise RuntimeError('Packet order is not right!')
-            send_ts = float(send_ts)
-            logger.debug('Recv a pack, idx:%s, send_ts:%s', cur_idx, send_ts)
-            owd = recv_ts - send_ts
-            owd_result.append(owd)
-            pack_idx += 1
-            recv_num += 1
-
-        csv_file.write(
-            ','.join(map(str, owd_result))
-        )
-        csv_file.write('\n')
-    except Exception as e:
-        csv_file.write(
-            ','.join(map(str, owd_result))
-        )
-        csv_file.write('\n')
-        raise e
-    finally:
-        recv_sock.close()
-        csv_file.close()
+    recv_sock.close()
+    csv_file.close()
 
 
 if __name__ == "__main__":
@@ -103,6 +105,8 @@ if __name__ == "__main__":
     parser.add_argument('--srv_buffer', type=int, default=512,
                         metavar='Buffer Size',
                         help='Server recv buffer size in bytes')
+    parser.add_argument('-r', '--round', type=int, default=1,
+                        help='Number of sending rounds')
 
     group.add_argument('-c', '--client', metavar='Address', type=str,
                        help='Run in UDP client mode')
@@ -132,6 +136,7 @@ if __name__ == "__main__":
 
     N_PACKETS = args.n_packets
     SRV_BUFFER_SIZE = args.srv_buffer
+    ROUND = args.round
 
     if args.server:
         ip, port = args.server.split(':')
