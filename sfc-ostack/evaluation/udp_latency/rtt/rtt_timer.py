@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # vim:fenc=utf-8
 """
-About : UDP Latency Measurement Tool
+About : UDP RTT Measurement Tool
 
 Email : xianglinks@gmail.com
 """
@@ -75,7 +75,7 @@ def recv_packets(port, n_packets, payload_len, output_file):
         # out_file.write("%d\n" % n_packets)
         for tup in rev_packets:
             packet_n = tup[0]
-            latency = "%.2f" % tup[1]
+            latency = "%.3f" % tup[1]
             out_file.write("%s,%s\n" % (packet_n, latency))
 
 
@@ -101,10 +101,8 @@ def send_packets(ip, port, n_packets, payload_len, send_rate):
         n_fill_bytes = payload_len - len(payload)
         fill_char = b'a'
         payload = payload + n_fill_bytes * fill_char
-        # MARK:
         sock_out.sendall(payload)
         tx_end_stmp = time.time()
-
         tx_time_sec = tx_end_stmp - tx_start_stmp
         sleep_time_sec = packet_interval - tx_time_sec
         logger.debug('Send packet_n: %d, Sleep time %.6f' %
@@ -136,10 +134,10 @@ def run_client(ip, port, n_packets, payload_len, send_rate, output_file,
             target=recv_packets,
             args=(listen_port, n_packets, payload_len, output_file))
 
-        logger.info('Client runs receiver')
+        logger.info('Client runs UDP receiver.')
         receiver.start()
 
-    logger.info('Client runs sender')
+    logger.info('Client runs UDP sender.')
     sender.start()
 
     # Block main process until sub-process finished
@@ -154,6 +152,7 @@ def run_client(ip, port, n_packets, payload_len, send_rate, output_file,
 
 
 def run_server(ip, port):
+    """Run echo server"""
     sock_in = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                             socket.IPPROTO_UDP)
     sock_in.bind((ip, port))
@@ -201,8 +200,6 @@ if __name__ == "__main__":
                         help='Length of packet in bytes')
     parser.add_argument("--send_rate", type=float, default=512,
                         help='Send rate in bytes/s')
-    parser.add_argument("--mode", choices=['RTT'], default='RTT',
-                        help='Measurement Mode. RTT: Round Trip Time')
     parser.add_argument("--log_level", choices=['INFO', 'DEBUG'], default='INFO',
                         help='Logging level')
     parser.add_argument("--output_file", default='latency.log', type=str,
@@ -223,8 +220,7 @@ if __name__ == "__main__":
         print('------------------------------------------------------------')
         print('UDP server listening on %s, port %d' % (ip, port))
         print('Server recv buffer size: %d' % SERVER_BUFFER_SIZE)
-        if args.mode == 'RTT':
-            print('- Received packets are sent back to port %d' % (port + 1))
+        print('- Received packets are sent back to port %d' % (port + 1))
         print('------------------------------------------------------------')
         run_server(ip, port)
 

@@ -3,7 +3,7 @@
 # vim:fenc=utf-8
 
 """
-About: Run UDP latency measurements
+About: Run UDP RTT measurements
 
 Email: xianglinks@gmail.com
 """
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             ) + '.csv'
 
             base_cmd = ''
-            base_cmd += 'python3 /home/ubuntu/udp_latency.py -c %s --payload_len %s ' % (
+            base_cmd += 'python3 /home/ubuntu/udp_rtt.py -c %s --payload_len %s ' % (
                 server_addr, payload_len)
             base_cmd += '--send_rate %s ' % (send_rate)
             base_cmd += '--output_file %s ' % (output_file)
