@@ -27,7 +27,7 @@ import matplotlib.ticker as ticker
 from matplotlib.pyplot import cm
 
 # Shared font config
-font_size = 8
+font_size = 9
 font_name = 'monospace'
 mpl.rc('font', family=font_name)
 
