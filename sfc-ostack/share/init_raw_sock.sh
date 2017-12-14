@@ -16,6 +16,10 @@ ip link set eth2 up
 dhclient eth1
 dhclient eth2
 
+# Disable ifce checksum offloading
+ethtool --offload eth1 rx off tx off
+ethtool --offload eth2 rx off tx off
+
 # Remove duplicated routing items
 ip route del $SUBNET_CIDR dev eth1
 ip route del $SUBNET_CIDR dev eth2
