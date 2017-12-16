@@ -39,11 +39,11 @@ def plot_udp_owd():
     base_path = './test_result/'
     warm_up_num = 20
 
-    sf_num_lst = range(1, 11)
-    # sf_method_tuple = ('lkf', 'pyf')
-    sf_method_tuple = ('pyf', )
-    # alloc_method_tuple = ('ns', 'fn', 'nsrd')
-    alloc_method_tuple = ('fn', )
+    sf_num_lst = range(1, 4)
+    # Order important, smaller ones should be plotted latter
+    # sf_method_tuple = ('pyf', 'lkf')
+    sf_method_tuple = ('lkf', )
+    alloc_method_tuple = ('ns', 'fn')
     owd_avg_map = dict()
     owd_hwci_map = dict()
     test_round = 5
@@ -64,44 +64,55 @@ def plot_udp_owd():
                 data = np.genfromtxt(csv_path, delimiter=',')
                 if data.shape[0] != test_round:
                     raise RuntimeError(
-                        'Test round is wrong! csv: %s' % csv_name)
+                        'Number of test rounds is wrong! csv: %s' % csv_name)
                 # Calc avg and hwci
                 tmp_lst = [np.average(
                     x) * 1000.0 for x in data[:, warm_up_num:]]
                 owd_avg_lst.append(np.average(tmp_lst))
                 owd_hwci_lst.append((T_FACTOR['99.9-%d' % test_round] *
                                      np.std(tmp_lst)) / np.sqrt(test_round - 1))
-
-        owd_avg_map[cur_mt] = owd_avg_lst
-        owd_hwci_map[cur_mt] = owd_hwci_lst
+            # cur_mt is defined in the inner-loop
+            owd_avg_map[cur_mt] = owd_avg_lst
+            owd_hwci_map[cur_mt] = owd_hwci_lst
 
     print(owd_avg_map)
     print(owd_hwci_map)
+
+    # sys.exit()
 
     ##########
     #  Plot  #
     ##########
 
-    py_cmap = cm.get_cmap('plasma')
+    # Try to be schoen...
+    cmap_lst = [cm.get_cmap(m) for m in ('tab10', 'Set3')]
+
     width = 0.25
     label_map = {
+        'lkf-fn': 'KF, Fill One',
+        'lkf-ns': 'KF, Nova Default',
         'pyf-fn': 'PyF, Fill One'
     }
 
     fig, ax = plt.subplots()
 
-    for sf_mt in sf_method_tuple:
+    for sf_idx, sf_mt in enumerate(sf_method_tuple):
         # change color map here
-        for alloc_mt in alloc_method_tuple:
+        for all_idx, alloc_mt in enumerate(alloc_method_tuple):
             cur_mt = '-'.join((sf_mt, alloc_mt))
             avg_lst = owd_avg_map[cur_mt]
             err_lst = owd_hwci_map[cur_mt]
-            pos = 0
-            x = [pos + x for x in range(1, 11)]
+            pos = 0 + all_idx * width
+            x = [pos + x for x in sf_num_lst]
             ax.bar(
-                x, avg_lst, width, alpha=0.8,
-                yerr=err_lst, color='blue', edgecolor='blue',
-                label=label_map[cur_mt]
+                x, avg_lst, width, alpha=0.7,
+                yerr=err_lst,
+                color=cmap_lst[sf_idx](
+                    float(all_idx) / len(alloc_method_tuple)),
+                edgecolor=cmap_lst[sf_idx](
+                    float(all_idx) / len(alloc_method_tuple)),
+                label=label_map[cur_mt],
+                error_kw=dict(elinewidth=1.5, ecolor='black')
             )
 
     ax.set_ylabel("One-way Delay (ms)", fontsize=font_size, fontname=font_name)

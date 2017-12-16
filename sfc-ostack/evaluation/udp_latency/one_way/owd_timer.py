@@ -55,9 +55,9 @@ def run_server():
 
     signal.signal(signal.SIGTERM, exit_server)
 
-    for rd in range(1, ROUND + 1):
-        pack_idx, recv_num = 0, 0
-        try:
+    try:
+        for rd in range(1, ROUND + 1):
+            pack_idx, recv_num = 0, 0
             logger.info('Current test round: %d' % rd)
             owd_result = list()
             while recv_num < N_PACKETS:
@@ -81,13 +81,13 @@ def run_server():
                 ','.join(map(str, owd_result))
             )
             csv_file.write('\n')
-        except Exception as e:
-            csv_file.write(str(e))
-            csv_file.write('\n')
-            continue
 
-    recv_sock.close()
-    csv_file.close()
+    except Exception as e:
+        csv_file.write(str(e))
+        csv_file.write('\n')
+    finally:
+        recv_sock.close()
+        csv_file.close()
 
 
 if __name__ == "__main__":
