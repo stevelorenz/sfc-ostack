@@ -36,6 +36,7 @@ def run_client():
 def run_server():
     """Run UDP server"""
 
+    n_packets = N_PACKETS
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)
 
@@ -57,26 +58,29 @@ def run_server():
 
     try:
         for rd in range(1, ROUND + 1):
-            pack_idx, recv_num = 0, 0
+            recv_idx = 0
             logger.info('Current test round: %d' % rd)
             owd_result = list()
-            while recv_num < N_PACKETS:
+            while recv_idx < n_packets:
                 pack = recv_sock.recv(SRV_BUFFER_SIZE)
                 recv_ts = time.time()
-                cur_idx, send_ts = pack.decode('ascii').split(',')[:2]
-                cur_idx = int(cur_idx)
-                if cur_idx != pack_idx:
-                    raise RuntimeError(
-                        'Packet order is not right! cur_idx: %d, pack_idx: %d' % (
-                            cur_idx, pack_idx)
+                send_idx, send_ts = pack.decode('ascii').split(',')[:2]
+                send_idx = int(send_idx)
+                if send_idx != recv_idx:
+                    logger.debug(
+                        'Packet order is not right! send_idx: %d, recv_idx: %d' % (
+                            send_idx, recv_idx)
                     )
+                    recv_idx = send_idx + 1
+                    n_packets = n_packets - (send_idx + 1)
+                    # Start calc owd from the next packet
+                    continue
                 send_ts = float(send_ts)
                 logger.debug('Recv a pack, idx:%s, send_ts:%s',
-                             cur_idx, send_ts)
+                             send_idx, send_ts)
                 owd = recv_ts - send_ts  # in second
                 owd_result.append(owd)
-                pack_idx += 1
-                recv_num += 1
+                recv_idx += 1
             csv_file.write(
                 ','.join(map(str, owd_result))
             )

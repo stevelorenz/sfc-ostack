@@ -99,7 +99,7 @@ def run_test():
             # exit_status=0)
 
             # Run UDP client on src instance
-            test_cmd = RUN_TIMER_CLT + '--n_packets %s' % (N_PACKETS + 5)
+            test_cmd = RUN_TIMER_CLT + '--n_packets %s' % (N_PACKETS)
             stdin, stdout, stderr = src_ssh_clt.exec_command(test_cmd)
             print(stdout.read().decode())
             time.sleep(6)

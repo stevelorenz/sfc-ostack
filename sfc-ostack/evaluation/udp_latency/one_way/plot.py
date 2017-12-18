@@ -20,6 +20,8 @@ import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 
 T_FACTOR = {
+    '99-4': 4.604,
+    '99.9-4': 8.610,
     '99-5': 4.032,
     '99.9-5': 6.869,
     '99-10': 3.169,
@@ -39,7 +41,7 @@ def plot_udp_owd():
     base_path = './test_result/'
     warm_up_num = 20
 
-    sf_num_lst = range(1, 4)
+    sf_num_lst = range(1, 8)
     # Order important, smaller ones should be plotted latter
     # sf_method_tuple = ('pyf', 'lkf')
     sf_method_tuple = ('lkf', )
@@ -62,7 +64,7 @@ def plot_udp_owd():
                 csv_name = '%s-owd-%d.csv' % (cur_mt, srv_num)
                 csv_path = os.path.join(base_path, csv_name)
                 data = np.genfromtxt(csv_path, delimiter=',')
-                if data.shape[0] != test_round:
+                if data.shape[0] < test_round:
                     raise RuntimeError(
                         'Number of test rounds is wrong! csv: %s' % csv_name)
                 # Calc avg and hwci
