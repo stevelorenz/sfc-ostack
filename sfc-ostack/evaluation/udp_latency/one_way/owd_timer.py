@@ -36,7 +36,7 @@ def run_client():
 def run_server():
     """Run UDP server"""
 
-    n_packets = N_PACKETS
+    cur_n_packets = N_PACKETS
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)
 
@@ -61,18 +61,18 @@ def run_server():
             recv_idx = 0
             logger.info('Current test round: %d' % rd)
             owd_result = list()
-            while recv_idx < n_packets:
+            while recv_idx < cur_n_packets:
                 pack = recv_sock.recv(SRV_BUFFER_SIZE)
                 recv_ts = time.time()
                 send_idx, send_ts = pack.decode('ascii').split(',')[:2]
                 send_idx = int(send_idx)
                 if send_idx != recv_idx:
-                    logger.debug(
-                        'Packet order is not right! send_idx: %d, recv_idx: %d' % (
-                            send_idx, recv_idx)
-                    )
                     recv_idx = send_idx + 1
-                    n_packets = n_packets - (send_idx + 1)
+                    cur_n_packets = cur_n_packets - (send_idx + 1)
+                    logger.debug(
+                        'Packet order is not right! send_idx: %d, recv_idx: %d, cur_n_packet: %d',
+                        send_idx, recv_idx, cur_n_packets
+                    )
                     # Start calc owd from the next packet
                     continue
                 send_ts = float(send_ts)

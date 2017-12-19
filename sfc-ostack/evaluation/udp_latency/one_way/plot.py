@@ -17,6 +17,7 @@ import numpy as np
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.pyplot import cm
 
 T_FACTOR = {
@@ -34,21 +35,23 @@ T_FACTOR = {
 font_size = 9
 font_name = 'monospace'
 mpl.rc('font', family=font_name)
+ALPHA = 0.8
 
 
 def plot_udp_owd():
     """Plot UDP one way delay"""
     base_path = './test_result/'
-    warm_up_num = 20
 
-    sf_num_lst = range(1, 8)
+    sf_num_lst = np.arange(1, 11, dtype='int32')
     # Order important, smaller ones should be plotted latter
     # sf_method_tuple = ('pyf', 'lkf')
     sf_method_tuple = ('lkf', )
-    alloc_method_tuple = ('ns', 'fn')
+    alloc_method_tuple = ('ns', 'fn', 'nsrd')
     owd_avg_map = dict()
     owd_hwci_map = dict()
     test_round = 5
+    min_num_packs = 5000
+    warm_up_num = 20
 
     ##########
     #  Clac  #
@@ -63,15 +66,38 @@ def plot_udp_owd():
             for srv_num in sf_num_lst:
                 csv_name = '%s-owd-%d.csv' % (cur_mt, srv_num)
                 csv_path = os.path.join(base_path, csv_name)
-                data = np.genfromtxt(csv_path, delimiter=',')
+                # Use pandas
+                df = pd.read_csv(
+                    csv_path, error_bad_lines=False, header=None,
+                    usecols=range(0, min_num_packs)
+                )
+                data = df.values
                 if data.shape[0] < test_round:
-                    raise RuntimeError(
-                        'Number of test rounds is wrong! csv: %s' % csv_name)
-                # Calc avg and hwci
+                    print(
+                        'Number of test rounds is wrong! csv: %s, number: %d' % (
+                            csv_name, data.shape[0]
+                        )
+                    )
+
                 tmp_lst = [np.average(
                     x) * 1000.0 for x in data[:, warm_up_num:]]
+
+                # Check speicial test round
+                if cur_mt == 'lkf-ns' and srv_num == 7:
+                    import ipdb
+                    # ipdb.set_trace()
+
+                # Check outliers
+                tmp_avg = np.average(tmp_lst)
+                tmp_std = np.std(tmp_lst)
+                for val in tmp_lst:
+                    if np.abs(val - tmp_avg) >= 2 * tmp_std:
+                        print('Outliers found, csv path:%s' % csv_path)
+                        import ipdb
+                        ipdb.set_trace()
+                # Calc avg and hwci
                 owd_avg_lst.append(np.average(tmp_lst))
-                owd_hwci_lst.append((T_FACTOR['99.9-%d' % test_round] *
+                owd_hwci_lst.append((T_FACTOR['99-%d' % test_round] *
                                      np.std(tmp_lst)) / np.sqrt(test_round - 1))
             # cur_mt is defined in the inner-loop
             owd_avg_map[cur_mt] = owd_avg_lst
@@ -80,20 +106,22 @@ def plot_udp_owd():
     print(owd_avg_map)
     print(owd_hwci_map)
 
-    # sys.exit()
-
     ##########
     #  Plot  #
     ##########
 
     # Try to be schoen...
-    cmap_lst = [cm.get_cmap(m) for m in ('tab10', 'Set3')]
+    # cmap_lst = [cm.get_cmap(m) for m in ('tab10', 'Set3')]
+    cmap_lst = [cm.get_cmap(m) for m in ('plasma', 'Set3')]
 
     width = 0.25
     label_map = {
         'lkf-fn': 'KF, Fill One',
-        'lkf-ns': 'KF, Nova Default',
-        'pyf-fn': 'PyF, Fill One'
+        'lkf-ns': 'KF, Nova Scheduler Default',
+        'lkf-nsrd': 'KF, NSD Reordered',
+        'pyf-fn': 'PyF, Fill One',
+        'pyf-ns': 'PyF, Nova Scheduler Default',
+        'pyf-nsrd': 'PyF, NSD Reordered'
     }
 
     fig, ax = plt.subplots()
@@ -107,16 +135,20 @@ def plot_udp_owd():
             pos = 0 + all_idx * width
             x = [pos + x for x in sf_num_lst]
             ax.bar(
-                x, avg_lst, width, alpha=0.7,
+                x, avg_lst, width, alpha=ALPHA,
                 yerr=err_lst,
                 color=cmap_lst[sf_idx](
                     float(all_idx) / len(alloc_method_tuple)),
                 edgecolor=cmap_lst[sf_idx](
                     float(all_idx) / len(alloc_method_tuple)),
                 label=label_map[cur_mt],
-                error_kw=dict(elinewidth=1.5, ecolor='black')
+                error_kw=dict(elinewidth=1, ecolor='red')
             )
 
+    ax.set_xticks(
+        sf_num_lst + (width / 2.0) * (len(alloc_method_tuple) - 1)
+    )
+    ax.set_xticklabels(sf_num_lst, fontsize=font_size, fontname=font_name)
     ax.set_ylabel("One-way Delay (ms)", fontsize=font_size, fontname=font_name)
     ax.set_xlabel("Number of chained SFIs",
                   fontsize=font_size, fontname=font_name)
