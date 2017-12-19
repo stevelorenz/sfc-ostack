@@ -38,15 +38,28 @@ mpl.rc('font', family=font_name)
 ALPHA = 0.8
 
 
-def plot_udp_owd():
+def plot_udp_owd(mode='l'):
     """Plot UDP one way delay"""
     base_path = './test_result/'
 
     sf_num_lst = np.arange(1, 11, dtype='int32')
+
     # Order important, smaller ones should be plotted latter
-    # sf_method_tuple = ('pyf', 'lkf')
-    sf_method_tuple = ('lkf', )
-    alloc_method_tuple = ('ns', 'fn', 'nsrd')
+    if mode == 'l':
+        sf_method_tuple = ('lkf', )
+        alloc_method_tuple = ('ns', 'fn', 'nsrd')
+        ms = ('plasma', )
+    elif mode == 'p':
+        sf_method_tuple = ('pyf', )
+        alloc_method_tuple = ('fn',)
+        ms = ('viridis', )
+    elif mode == 'a' or mode == 'as':
+        sf_method_tuple = ('lkf', 'pyf')
+        alloc_method_tuple = ('fn', )
+        ms = ('plasma', 'Set3')
+
+    cmap_lst = [cm.get_cmap(m) for m in ms]
+
     owd_avg_map = dict()
     owd_hwci_map = dict()
     test_round = 5
@@ -110,10 +123,6 @@ def plot_udp_owd():
     #  Plot  #
     ##########
 
-    # Try to be schoen...
-    # cmap_lst = [cm.get_cmap(m) for m in ('tab10', 'Set3')]
-    cmap_lst = [cm.get_cmap(m) for m in ('plasma', 'Set3')]
-
     width = 0.25
     label_map = {
         'lkf-fn': 'KF, Fill One',
@@ -124,7 +133,13 @@ def plot_udp_owd():
         'pyf-nsrd': 'PyF, NSD Reordered'
     }
 
-    fig, ax = plt.subplots()
+    ax_lst = list()
+    if mode != 'as':
+        fig, ax = plt.subplots()
+        ax_lst.extend([ax, ax])
+    else:
+        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+        ax_lst.extend([ax1, ax2])
 
     for sf_idx, sf_mt in enumerate(sf_method_tuple):
         # change color map here
@@ -134,7 +149,7 @@ def plot_udp_owd():
             err_lst = owd_hwci_map[cur_mt]
             pos = 0 + all_idx * width
             x = [pos + x for x in sf_num_lst]
-            ax.bar(
+            ax_lst[sf_idx].bar(
                 x, avg_lst, width, alpha=ALPHA,
                 yerr=err_lst,
                 color=cmap_lst[sf_idx](
@@ -144,23 +159,47 @@ def plot_udp_owd():
                 label=label_map[cur_mt],
                 error_kw=dict(elinewidth=1, ecolor='red')
             )
+    if mode != 'as':
+        ax = ax_lst[0]
+        ax.set_xticks(
+            sf_num_lst + (width / 2.0) * (len(alloc_method_tuple) - 1)
+        )
+        ax.set_xticklabels(sf_num_lst, fontsize=font_size, fontname=font_name)
+        ax.set_ylabel("One-way Delay (ms)",
+                      fontsize=font_size, fontname=font_name)
+        ax.set_xlabel("Number of chained SFIs",
+                      fontsize=font_size, fontname=font_name)
 
-    ax.set_xticks(
-        sf_num_lst + (width / 2.0) * (len(alloc_method_tuple) - 1)
-    )
-    ax.set_xticklabels(sf_num_lst, fontsize=font_size, fontname=font_name)
-    ax.set_ylabel("One-way Delay (ms)", fontsize=font_size, fontname=font_name)
-    ax.set_xlabel("Number of chained SFIs",
-                  fontsize=font_size, fontname=font_name)
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, labels, fontsize=font_size,
+                  loc='upper left')
 
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=font_size,
-              loc='upper left')
+        ax.yaxis.grid(which='major', lw=0.5, ls='--')
+    else:
+        for ax in ax_lst:
+            ax.set_xticks(
+                sf_num_lst + (width / 2.0) * (len(alloc_method_tuple) - 1)
+            )
+            ax.set_xticklabels(
+                sf_num_lst, fontsize=font_size, fontname=font_name)
+            # ax.set_xlabel("Number of chained SFIs",
+            # fontsize=font_size, fontname=font_name)
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles, labels, fontsize=font_size - 2,
+                      loc='upper left')
+            ax.yaxis.grid(which='major', lw=0.5, ls='--')
+        ax = ax_lst[0]
+        ax.set_ylabel("One-way Delay (ms)",
+                      fontsize=font_size, fontname=font_name)
+        # Add a shared x label
+        fig.text(0.5, 0.04, 'Number of chained SFIs', ha='center',
+                 fontsize=font_size, fontname=font_name)
 
-    ax.yaxis.grid(which='major', lw=0.5, ls='--')
-    fig.savefig('one_way_delay.pdf',
+    fig.savefig('one_way_delay_%s.pdf' % mode,
                 bbox_inches='tight', dpi=400, format='pdf')
 
 
 if __name__ == "__main__":
-    plot_udp_owd()
+    if len(sys.argv) < 2:
+        raise RuntimeError('Missing mode options. Use l, f or a')
+    plot_udp_owd(sys.argv[1])
