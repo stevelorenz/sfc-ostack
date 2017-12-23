@@ -9,8 +9,15 @@ cd "../udp_latency/one_way/" || exit
 python3 ./plot.py
 mv ./*.pdf "$sp_dir/"
 
+# UDP OWD
+cd "$sp_dir/../udp_latency/owd/" || exit
+python3 ./plot.py l
+python3 ./plot.py p
+python3 ./plot.py as
+mv ./*.pdf "$sp_dir/"
+
 # UDP RTT
-cd "$sp_dir/../udp_latency/rtt" || exit
+cd "$sp_dir/../udp_latency/rtt/" || exit
 python3 ./plot.py -a
 mv ./*.pdf "$sp_dir/"
 

@@ -19,23 +19,13 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.pyplot import cm
-
-T_FACTOR = {
-    '99-4': 4.604,
-    '99.9-4': 8.610,
-    '99-5': 4.032,
-    '99.9-5': 6.869,
-    '99-10': 3.169,
-    '99.9-10': 4.587,
-    '99-inf': 2.576,
-    '99-15': 2.947,
-    '99.9-15': 4.073
-}
+from scipy import stats
 
 font_size = 9
 font_name = 'monospace'
 mpl.rc('font', family=font_name)
 ALPHA = 0.8
+cfd_level = 0.99
 
 
 def plot_udp_owd(mode='l'):
@@ -55,7 +45,7 @@ def plot_udp_owd(mode='l'):
         ms = ('viridis', )
     elif mode == 'a' or mode == 'as':
         sf_method_tuple = ('lkf', 'pyf')
-        alloc_method_tuple = ('fn', )
+        alloc_method_tuple = ('ns', 'fn', )
         ms = ('plasma', 'Set3')
 
     cmap_lst = [cm.get_cmap(m) for m in ms]
@@ -94,11 +84,13 @@ def plot_udp_owd(mode='l'):
 
                 tmp_lst = [np.average(
                     x) * 1000.0 for x in data[:, warm_up_num:]]
+                tmp_lst = tmp_lst[:test_round]
 
                 # Check speicial test round
-                if cur_mt == 'lkf-ns' and srv_num == 7:
-                    import ipdb
+                if cur_mt == 'pyf-ns' and srv_num == 4:
+                    # import ipdb
                     # ipdb.set_trace()
+                    pass
 
                 # Check outliers
                 tmp_avg = np.average(tmp_lst)
@@ -106,12 +98,15 @@ def plot_udp_owd(mode='l'):
                 for val in tmp_lst:
                     if np.abs(val - tmp_avg) >= 2 * tmp_std:
                         print('Outliers found, csv path:%s' % csv_path)
-                        import ipdb
-                        ipdb.set_trace()
                 # Calc avg and hwci
                 owd_avg_lst.append(np.average(tmp_lst))
-                owd_hwci_lst.append((T_FACTOR['99-%d' % test_round] *
-                                     np.std(tmp_lst)) / np.sqrt(test_round - 1))
+                # owd_hwci_lst.append((T_FACTOR['99-%d' % test_round] *
+                # np.std(tmp_lst)) / np.sqrt(test_round - 1))
+                owd_hwci_lst.append(
+                    # Get T factor with confidence level
+                    (stats.t.interval(cfd_level, test_round, loc=0, scale=1)
+                     [1] * np.std(tmp_lst)) / np.sqrt(test_round - 1)
+                )
             # cur_mt is defined in the inner-loop
             owd_avg_map[cur_mt] = owd_avg_lst
             owd_hwci_map[cur_mt] = owd_hwci_lst

@@ -7,7 +7,7 @@ PIP_REQUIREMENTS = './requirements.txt'
 PIP_REQUIREMENTS_DEV = './dev_requirements.txt'
 UNITTEST_SFC_OSTACK = './sfcostack/test/'
 
-PYSRC_ALL = $(shell find ./ -path './venv' -prune -o -name '*.py' -print)
+PYSRC_ALL = $(shell find ./ -path './venv' -prune -o -name '*.py' ! -name 'plot.py' -print)
 PYSRC_SFC_OSTACK = $(shell find ./sfcostack -path './venv' -prune -o -name '*.py' -print)
 BASHSRC_ALL = $(shell find ./ -path './venv' -prune -o -name '*.sh' -print)
 
