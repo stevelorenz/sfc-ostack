@@ -41,12 +41,13 @@ def plot_udp_owd(mode='l'):
         ms = ('plasma', )
     elif mode == 'p':
         sf_method_tuple = ('pyf', )
-        alloc_method_tuple = ('fn',)
+        alloc_method_tuple = ('ns', 'fn', 'nsrd')
         ms = ('viridis', )
     elif mode == 'a' or mode == 'as':
         sf_method_tuple = ('lkf', 'pyf')
-        alloc_method_tuple = ('ns', 'fn', )
-        ms = ('plasma', 'Set3')
+        alloc_method_tuple = ('ns', 'fn', 'nsrd')
+        # ms = ('plasma', 'Set3')
+        ms = ('plasma', 'viridis')
 
     cmap_lst = [cm.get_cmap(m) for m in ms]
 
@@ -121,10 +122,10 @@ def plot_udp_owd(mode='l'):
     width = 0.25
     label_map = {
         'lkf-fn': 'KF, Fill One',
-        'lkf-ns': 'KF, Nova Scheduler Default',
+        'lkf-ns': 'KF, NSD',
         'lkf-nsrd': 'KF, NSD Reordered',
         'pyf-fn': 'PyF, Fill One',
-        'pyf-ns': 'PyF, Nova Scheduler Default',
+        'pyf-ns': 'PyF, NSD',
         'pyf-nsrd': 'PyF, NSD Reordered'
     }
 
