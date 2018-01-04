@@ -53,9 +53,9 @@ def plot_udp_owd(mode='l'):
 
     owd_avg_map = dict()
     owd_hwci_map = dict()
-    test_round = 5
+    test_round = 15
     min_num_packs = 5000
-    warm_up_num = 20
+    warm_up_num = 500
 
     ##########
     #  Clac  #
@@ -64,10 +64,11 @@ def plot_udp_owd(mode='l'):
     for sf_mt in sf_method_tuple:
         for alloc_mt in alloc_method_tuple:
             cur_mt = '-'.join((sf_mt, alloc_mt))
-            print(cur_mt)
+            print(cur_mt + '\n' + '-' * 30)
             owd_avg_lst = list()
             owd_hwci_lst = list()
             for srv_num in sf_num_lst:
+                print('--- srv_num: %d' % srv_num)
                 csv_name = '%s-owd-%d.csv' % (cur_mt, srv_num)
                 csv_path = os.path.join(base_path, csv_name)
                 # Use pandas
@@ -87,8 +88,22 @@ def plot_udp_owd(mode='l'):
                     x) * 1000.0 for x in data[:, warm_up_num:]]
                 tmp_lst = tmp_lst[:test_round]
 
+                # Filter out Nan
+                nan_idx = list()
+                isnan_result = np.isnan(tmp_lst)
+                for idx, rst in enumerate(tmp_lst):
+                    if rst == True:
+                        nan_idx.append(idx)
+                if nan_idx:
+                    print('Nan detected, nan index:')
+                    print(nan_idx)
+
+                tmp_lst = [value for value in tmp_lst if not np.isnan(value)]
+                if len(tmp_lst) != test_round:
+                    print('Nan detected, after filter: %d' % len(tmp_lst))
+
                 # Check speicial test round
-                if cur_mt == 'pyf-ns' and srv_num == 4:
+                if cur_mt == 'pyf-fn' and srv_num == 9:
                     # import ipdb
                     # ipdb.set_trace()
                     pass
@@ -96,9 +111,13 @@ def plot_udp_owd(mode='l'):
                 # Check outliers
                 tmp_avg = np.average(tmp_lst)
                 tmp_std = np.std(tmp_lst)
-                for val in tmp_lst:
+                ol_idx = list()
+                for idx, val in enumerate(tmp_lst):
                     if np.abs(val - tmp_avg) >= 2 * tmp_std:
-                        print('Outliers found, csv path:%s' % csv_path)
+                        print('Outliers found, csv path:%s, index: %d' %
+                              (csv_path, idx))
+                        ol_idx.append(idx)
+                print('Outlier list: %s' % ','.join(map(str, ol_idx)))
                 # Calc avg and hwci
                 owd_avg_lst.append(np.average(tmp_lst))
                 # owd_hwci_lst.append((T_FACTOR['99-%d' % test_round] *
@@ -112,8 +131,8 @@ def plot_udp_owd(mode='l'):
             owd_avg_map[cur_mt] = owd_avg_lst
             owd_hwci_map[cur_mt] = owd_hwci_lst
 
-    print(owd_avg_map)
-    print(owd_hwci_map)
+    # print(owd_avg_map)
+    # print(owd_hwci_map)
 
     ##########
     #  Plot  #
