@@ -6,11 +6,6 @@ sp_dir=$(pwd)
 
 # UDP Ony-way Delay
 cd "../udp_latency/one_way/" || exit
-python3 ./plot.py
-mv ./*.pdf "$sp_dir/"
-
-# UDP OWD
-cd "$sp_dir/../udp_latency/owd/" || exit
 python3 ./plot.py l
 python3 ./plot.py p
 python3 ./plot.py as

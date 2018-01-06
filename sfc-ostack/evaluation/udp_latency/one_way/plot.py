@@ -27,6 +27,13 @@ mpl.rc('font', family=font_name)
 ALPHA = 0.8
 cfd_level = 0.99
 
+def plot_ipd_owd():
+    """Plot inter-packet delay tests for owd"""
+    pass
+
+def plot_plsize_owd():
+    """Plot payload size tests for owd"""
+    pass
 
 def plot_udp_owd(mode='l'):
     """Plot UDP one way delay"""
@@ -217,4 +224,9 @@ def plot_udp_owd(mode='l'):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         raise RuntimeError('Missing mode options. Use l, f or a')
-    plot_udp_owd(sys.argv[1])
+    elif sys.argv[1] == 'ipd':
+        plot_ipd_owd()
+    elif sys.argv[1] == 'pls':
+        plot_plsize_owd()
+    else:
+        plot_udp_owd(sys.argv[1])
