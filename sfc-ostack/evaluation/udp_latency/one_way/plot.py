@@ -27,13 +27,96 @@ mpl.rc('font', family=font_name)
 ALPHA = 0.8
 cfd_level = 0.99
 
+WARM_UP_NUM = 500
+
+
 def plot_ipd_owd():
     """Plot inter-packet delay tests for owd"""
-    pass
+    base_path = './test_result/'
+    sf_method_tuple = ('lkf', )
+    alloc_method_tuple = ('ns', )
+    ipd_tuple = (0.003, 0.004, 0.005, 0.010, 0.020)
+    sf_num_lst = ('10', )
+    owd_avg_map = dict()
+    owd_hwci_map = dict()
+    cmap = cm.get_cmap('plasma')
+
+    for sfm in sf_method_tuple:
+        for alloc in alloc_method_tuple:
+            for num in sf_num_lst:
+                cur_typ = sfm + '-' + alloc + '-' + num
+                owd_avg, owd_hwci = [], []
+                for ipd in ipd_tuple:
+                    csv_name = '%s-%s-%.3f-owd-%s.csv' % (sfm, alloc, ipd, num)
+                    csv_path = os.path.join(base_path, csv_name)
+                    # Use pandas
+                    df = pd.read_csv(
+                        csv_path, error_bad_lines=False, header=None,
+                        usecols=range(0, 5000)
+                    )
+                    data = df.values
+                    test_round = data.shape[0]
+                    if test_round < 15:
+                        print('[Warn] Not enough test round, number: %d' %
+                              test_round)
+                    tmp_lst = [np.average(
+                        x) * 1000.0 for x in data[:, WARM_UP_NUM:]]
+                    tmp_lst = tmp_lst[:15]
+                    owd_avg.append(np.average(tmp_lst))
+                    owd_hwci.append(
+                        # Get T factor with confidence level
+                        (stats.t.interval(cfd_level, test_round, loc=0, scale=1)
+                         [1] * np.std(tmp_lst)) / np.sqrt(test_round - 1)
+                    )
+                owd_avg_map[cur_typ] = owd_avg
+                owd_hwci_map[cur_typ] = owd_hwci
+
+    print(owd_avg_map)
+
+    ##########
+    #  Plot  #
+    ##########
+
+    label_map = {
+        'lkf-ns-10': 'KF, NSD, SF_NUM = 10',
+    }
+
+    fig, ax = plt.subplots()
+
+    sn = 0
+    for cur_typ, ipd_lst in owd_avg_map.items():
+        print('Current type: %s' % cur_typ)
+        color = cmap(sn / float(len(owd_avg_map.keys())))
+        ipd_err = owd_hwci_map[cur_typ]
+        ax.errorbar(ipd_tuple, ipd_lst, yerr=ipd_err, color=color, ls='--',
+                    marker='o', markerfacecolor='None', markeredgewidth=1, markeredgecolor=color,
+                    label=label_map[cur_typ])
+        sn += 1
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, fontsize=font_size,
+              loc='upper left')
+
+    # ax.set_xlim(0.002, 0.025)
+    ax.set_xticks(ipd_tuple)
+    ax.set_xticklabels([int(ipd * 1000) for ipd in ipd_tuple],
+                       fontsize=font_size, fontname=font_name)
+    ax.set_ylabel("One-way Delay (ms)",
+                  fontsize=font_size, fontname=font_name)
+    ax.set_xlabel("Inter-packet Delay (ms)",
+                  fontsize=font_size, fontname=font_name)
+
+    ax.xaxis.grid(which='major', lw=0.5, ls='--')
+    ax.yaxis.grid(which='major', lw=0.5, ls='--')
+
+    fig.savefig('one_way_delay_ipd.pdf', bbox_inches='tight',
+                dpi=400, format='pdf')
+
 
 def plot_plsize_owd():
     """Plot payload size tests for owd"""
     pass
+
 
 def plot_udp_owd(mode='l'):
     """Plot UDP one way delay"""
