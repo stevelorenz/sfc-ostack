@@ -38,6 +38,8 @@ font_name = 'Monospace'
 mpl.rc('font', family=font_name)
 # mpl.use('TkAgg')
 
+ALPHA = 0.8
+
 cmap = cm.get_cmap('plasma')
 
 
@@ -260,7 +262,7 @@ def plot_plen():
             pos = [0 + sf_idx * width] * len(plen_lst)
             cur_x = [sf_idx * width + x for x in range(1, 6)]
             ax.bar(cur_x, lat_avg_plen[sf_idx], yerr=lat_hwci_plen[sf_idx],
-                   error_kw=dict(elinewidth=1, ecolor='red'),
+                   error_kw=dict(elinewidth=1, ecolor='red'), alpha=ALPHA,
                    width=width, color=color, lw=1, label=label)
 
     ax.set_xticks([x + (len(sf_num_lst) - 1) *
@@ -525,7 +527,7 @@ def plot_three_host():
         y = lat_avg_map[method]
 
         rect = ax.bar(x + pos, y, width=width, yerr=lat_hwci_map[method],
-                      label=label, color=color, edgecolor=color,
+                      label=label, color=color, edgecolor=color, alpha=ALPHA,
                       error_kw=dict(elinewidth=1, ecolor='red'))
 
         # autolabel_bar(ax, rect)
