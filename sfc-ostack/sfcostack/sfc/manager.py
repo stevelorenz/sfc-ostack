@@ -225,6 +225,26 @@ class StaticSFCManager(BaseSFCManager):
 
     # --- SFC CRUD ---
 
+    def create(self, sfc_conf, wait_sf_ready=True,
+               wait_method='udp_packet'):
+        """Create a SFC"""
+
+        placement_algo = sfc_conf.function_chain.placement_algo
+
+        if placement_algo not in ('nsd', 'fo', 'nsdro'):
+            raise SFCManagerError('Unknown placement algorithm for SFC.')
+
+        method_table = {
+            'nsd': ('nova_default', 'default'),
+            'fo': ('fill_one', 'default'),
+            'nsdro': ('nova_default', 'min_lat')
+        }
+
+        alloc_method, chain_method = method_table.get(placement_algo)
+        logger.info('SFC placement algorithm: %s' % placement_algo)
+        self.create_sfc(sfc_conf, alloc_method, chain_method, wait_sf_ready,
+                        wait_method)
+
     def create_sfc(self, sfc_conf,
                    alloc_method, chain_method,
                    wait_sf_ready=True, wait_method='udp_packet'):
@@ -376,6 +396,9 @@ class StaticSFCManager(BaseSFCManager):
 
         else:
             return resource.SFC(sfc_name, sfc_desc, srv_chn, port_chn)
+
+    def delete(self, sfc):
+        self.delete_sfc(sfc)
 
     def delete_sfc(self, sfc):
         logger.info(

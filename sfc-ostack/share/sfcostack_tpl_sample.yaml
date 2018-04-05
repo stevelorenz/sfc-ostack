@@ -43,6 +43,9 @@ SFC:
   function_chain:
     name: udp_forwarding_dst_9999
     description: A simple forwarding chain for flows with destination UDP port 9999
+    # Placement algorithm. Can be nsd, fo, nsdro
+    # nsd: Nova scheduler default, fo: Fill one, nsdro: NSD Reordered
+    placement_algo: nsd
     availability_zone: nova
     # A ordered list of available hypervisors for allocating SFC
     # The hypervisors are listed according to the allocating priority
