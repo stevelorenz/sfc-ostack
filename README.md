@@ -1,6 +1,8 @@
-# SFC-Ostack: A Simple Research Framework for SFC on OpenStack #
+# **SFC-Ostack**: A Simple Research Framework for SFC on OpenStack #
 
-SFC-Ostack focus currently on efficient cloud resource allocation and Service Function Instance (SFI) chaining.
+SFC-Ostack focus currently on delay-aware Service Function Instance Allocation and Chaining (SFIAC) algorithms.
+
+For installation and usage of SFC-Ostack, check the [README](./sfc-ostack/README.md) in **./sfc-ostack/**.
 
 ## Catalog ##
 
