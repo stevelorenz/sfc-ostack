@@ -2,6 +2,10 @@
 
 **TODO**: Add descriptions here.
 
+**WARN**: **SFC-Ostack** is currently not built as a OpenStack service. It only runs on the controller node and doesn't
+write data into OpenStack database. To keep it light-weight and simple, it tries to use OpenStack's services as little
+as possible.
+
 ## Getting Started ##
 
 ### Installing
@@ -9,19 +13,19 @@
 1. Download the repository
 
 ```
-$ git clone https://github.com/stevelorenz/sfc-ostack.git
+  $ git clone https://github.com/stevelorenz/sfc-ostack.git
 ```
 
 2. The **SFC-Ostack** can be installed using setup.py, currently not uploaded to PyPi.
 
 ```
-$ python3  sfc-ostack/sfc-ostack/setup.py
+  $ python3  sfc-ostack/sfc-ostack/setup.py
 ```
 
 3. Check the installation via pip
 
 ```
-$ pip list | grep sfc-ostack
+  $ pip list | grep sfc-ostack
 ```
 
 ### Examples
@@ -36,6 +40,8 @@ $ pip list | grep sfc-ostack
 - An example of implementing raw sockets based SFPG can be found in **./demo/sfp/fwd_forback.py**
 
 - A demo of sfc-ostack basic functionalities can be found in **./demo/show_func/show_func.py**
+
+- Examples of latency performance measurements codes can be found in **./evaluation/**
 
 ## Contributing ##
 

@@ -137,7 +137,7 @@ def plot_udp_owd(mode='l'):
         sf_method_tuple = ('lkf', 'pyf')
         alloc_method_tuple = ('ns', 'fn', 'nsrd')
         # ms = ('plasma', 'Set3')
-        ms = ('plasma', 'viridis')
+        ms = ('plasma', 'tab10')
 
     cmap_lst = [cm.get_cmap(m) for m in ms]
 
