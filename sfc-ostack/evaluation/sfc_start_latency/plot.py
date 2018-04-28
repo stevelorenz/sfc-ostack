@@ -17,6 +17,8 @@ Email: xianglinks@gmail.com
 
 import os
 import sys
+sys.path.append('../scripts/')
+import tex
 
 import ipdb
 import numpy as np
@@ -27,7 +29,7 @@ import matplotlib.ticker as ticker
 from matplotlib.pyplot import cm
 
 # Shared font config
-font_size = 9
+font_size = 8
 font_name = 'monospace'
 mpl.rc('font', family=font_name)
 
@@ -53,13 +55,13 @@ T_FACTOR_N = {
     '99.9-15': 4.073
 }
 
-cmap = cm.get_cmap('plasma')
+cmap = cm.get_cmap('tab10')
 # cmap = plt.get_cmap('hsv')
 
 
 def save_fig(fig, path):
     """Save fig to path"""
-    fig.savefig(path + '.pdf',
+    fig.savefig(path + '.pdf', pad_inches=0,
                 bbox_inches='tight', dpi=400, format='pdf')
 
 
@@ -171,6 +173,9 @@ def plot_single_node():
 def plot_start_three_compute(inc_wait=True):
     """Plot start time results on three compute nodes"""
 
+    tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
+              params={})
+
     test_round = 30
 
     ##########
@@ -185,7 +190,7 @@ def plot_start_three_compute(inc_wait=True):
     method_tuple = ('ns', 'fn', 'nsrd')
     ts_info_tuple = (
         'SFI launching time',
-        'SFP waiting time',
+        'SFPG waiting time',
         'SFI reordering time',
         'PC building time'
     )
@@ -224,7 +229,7 @@ def plot_start_three_compute(inc_wait=True):
     #  Plot  #
     ##########
 
-    method_label_tuple = ('N', 'F', 'R')
+    method_label_tuple = ('LB', 'LC', 'LBLC')
 
     fig, ax = plt.subplots()
 
@@ -242,9 +247,8 @@ def plot_start_three_compute(inc_wait=True):
         pos = 0 + m_idx * width
         result_lst = result_map[method]
 
-        cmap = cm.get_cmap('Set2')
-        colors = [cmap(x * 1 / len(ts_info_tuple))
-                  for x in range(len(ts_info_tuple))]
+        cmap = cm.get_cmap('tab10')
+        colors = [cmap(x) for x in range(len(ts_info_tuple))]
 
         # MARK: Ugly code...
         for srv_num, ts_tuple in enumerate(result_lst):
@@ -261,11 +265,9 @@ def plot_start_three_compute(inc_wait=True):
                 # Add legend
                 if method == method_tuple[0] and srv_num == 0:
                     handles, labels = ax.get_legend_handles_labels()
-                    ax.legend(handles, labels, fontsize=font_size,
-                              loc='best')
+                    ax.legend(handles, labels, loc='best')
 
-    ax.set_xlabel("Number of chained SFIs",
-                  fontsize=font_size, fontname=font_name)
+    ax.set_xlabel("Chain length")
 
     ax.axhline(y=-0.005, color='black', linestyle='-', lw=1)
     # ax.text(0.5, -0.03, 'SFC creation method',
@@ -273,14 +275,15 @@ def plot_start_three_compute(inc_wait=True):
     # transform=ax.transAxes,
     # color='black', fontsize=font_size)
 
-    ax.spines["bottom"].set_position(("axes", -0.005))
+    ax.spines["bottom"].set_position(("axes", -0.2))
     ax.tick_params(axis='x', which='both', length=0)
     ax.spines["bottom"].set_visible(False)
     ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
-    ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
+    ax.set_xticklabels(x)
     # ax.set_xlim(0, 11)
 
-    ax.set_ylabel("Start Time (s)", fontsize=font_size, fontname=font_name)
+    ax.set_ylabel("Rendering duration (s)")
+    ax.set_ylim(0, 320)
 
     # ax.grid(linestyle='--', lw=0.5)
     ax.yaxis.grid(which='major', lw=0.5, ls='--')
@@ -290,9 +293,11 @@ def plot_start_three_compute(inc_wait=True):
 
 def autolabel_bar(ax, rects, height, label):
     for rect in rects:
-        ax.text(rect.get_x() + rect.get_width() / 2.0, 1.05 * height,
-                label, fontsize=font_size - 2,
-                ha='center', va='bottom')
+        ax.text(rect.get_x() + rect.get_width() / 2.0, 5 * height,
+                label, fontsize=font_size - 3,
+                ha='center', va='bottom',
+                rotation='vertical'
+                )
 
 
 def _filter_outlier_gap(ins_data_arr):
@@ -362,15 +367,17 @@ def plot_gap_three_compute():
     #  Plot  #
     ##########
 
-    method_label_tuple = ('Nova Scheduler Default',
-                          'Fill One',
-                          'NSD Reordered')
+    tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
+              params={})
+
+    method_label_tuple = ('LB',
+                          'LC',
+                          'LBLC')
 
     fig, ax = plt.subplots()
     width = 0.25
 
-    colors = [cmap(x * 1 / len(method_tuple))
-              for x in range(len(method_tuple))]
+    colors = [cmap(x) for x in range(len(method_tuple))]
 
     for m_idx, method in enumerate(method_tuple):
         gt_lst = result_map[method]
@@ -383,16 +390,14 @@ def plot_gap_three_compute():
         )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=font_size,
-              loc='best')
+    ax.legend(handles, labels, loc='best')
 
-    ax.set_xlabel("Number of chained SFIs",
-                  fontsize=font_size, fontname=font_name)
+    ax.set_xlabel('Chain length')
 
     x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
     ax.set_xticks(x + (width / 2.0) * (len(method_tuple) - 1))
-    ax.set_xticklabels(x, fontsize=font_size, fontname=font_name)
-    ax.set_ylabel("Gap Time (s)", fontsize=font_size, fontname=font_name)
+    ax.set_xticklabels(x)
+    ax.set_ylabel("Gap duration (s)")
 
     ax.yaxis.grid(which='major', lw=0.5, ls='--')
 

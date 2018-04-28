@@ -11,6 +11,8 @@ Email: xianglinks@gmail.com
 
 import os
 import sys
+sys.path.append('../../scripts')
+import tex
 
 import ipdb
 import numpy as np
@@ -78,7 +80,7 @@ def plot_ipd_owd():
     ##########
 
     label_map = {
-        'lkf-ns-10': 'KF, NSD, SF_NUM = 10',
+        'lkf-ns-10': 'LKF, NSD, SF_NUM = 10',
     }
 
     fig, ax = plt.subplots()
@@ -128,16 +130,16 @@ def plot_udp_owd(mode='l'):
     if mode == 'l':
         sf_method_tuple = ('lkf', )
         alloc_method_tuple = ('ns', 'fn', 'nsrd')
-        ms = ('plasma', )
+        ms = ('tab10', )
     elif mode == 'p':
         sf_method_tuple = ('pyf', )
         alloc_method_tuple = ('ns', 'fn', 'nsrd')
-        ms = ('viridis', )
+        ms = ('Set1', )
     elif mode == 'a' or mode == 'as':
         sf_method_tuple = ('lkf', 'pyf')
         alloc_method_tuple = ('ns', 'fn', 'nsrd')
         # ms = ('plasma', 'Set3')
-        ms = ('plasma', 'tab10')
+        ms = ('tab10', 'Set1')
 
     cmap_lst = [cm.get_cmap(m) for m in ms]
 
@@ -228,14 +230,17 @@ def plot_udp_owd(mode='l'):
     #  Plot  #
     ##########
 
+    tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
+              params={})
+
     width = 0.25
     label_map = {
-        'lkf-fn': 'KF, Fill One',
-        'lkf-ns': 'KF, NSD',
-        'lkf-nsrd': 'KF, NSD Reordered',
-        'pyf-fn': 'PyF, Fill One',
-        'pyf-ns': 'PyF, NSD',
-        'pyf-nsrd': 'PyF, NSD Reordered'
+        'lkf-fn': 'LKF LC',
+        'lkf-ns': 'LKF LB',
+        'lkf-nsrd': 'LKF LBLC',
+        'pyf-fn': 'PyF LC',
+        'pyf-ns': 'PyF LB',
+        'pyf-nsrd': 'PyF LBLC'
     }
 
     ax_lst = list()
@@ -257,10 +262,8 @@ def plot_udp_owd(mode='l'):
             ax_lst[sf_idx].bar(
                 x, avg_lst, width, alpha=ALPHA,
                 yerr=err_lst,
-                color=cmap_lst[sf_idx](
-                    float(all_idx) / len(alloc_method_tuple)),
-                edgecolor=cmap_lst[sf_idx](
-                    float(all_idx) / len(alloc_method_tuple)),
+                color=cmap_lst[sf_idx](all_idx),
+                edgecolor=cmap_lst[sf_idx](all_idx),
                 label=label_map[cur_mt],
                 error_kw=dict(elinewidth=1, ecolor='red')
             )
@@ -269,15 +272,13 @@ def plot_udp_owd(mode='l'):
         ax.set_xticks(
             sf_num_lst + (width / 2.0) * (len(alloc_method_tuple) - 1)
         )
-        ax.set_xticklabels(sf_num_lst, fontsize=font_size, fontname=font_name)
-        ax.set_ylabel("One-way Delay (ms)",
-                      fontsize=font_size, fontname=font_name)
-        ax.set_xlabel("Number of chained SFIs",
-                      fontsize=font_size, fontname=font_name)
+        ax.set_xticklabels(sf_num_lst)
+        ax.set_ylabel("OWD (ms)")
+        ax.set_xlabel("Chain length")
+        ax.set_ylim(0, 11)
 
         handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles, labels, fontsize=font_size,
-                  loc='upper left')
+        ax.legend(handles, labels, loc='upper left')
 
         ax.yaxis.grid(which='major', lw=0.5, ls='--')
     else:
@@ -285,22 +286,20 @@ def plot_udp_owd(mode='l'):
             ax.set_xticks(
                 sf_num_lst + (width / 2.0) * (len(alloc_method_tuple) - 1)
             )
-            ax.set_xticklabels(
-                sf_num_lst, fontsize=font_size, fontname=font_name)
+            ax.set_xticklabels(sf_num_lst)
             # ax.set_xlabel("Number of chained SFIs",
             # fontsize=font_size, fontname=font_name)
             handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles, labels, fontsize=font_size - 2,
-                      loc='upper left')
+            ax.legend(handles, labels, loc='upper left')
             ax.yaxis.grid(which='major', lw=0.5, ls='--')
         ax = ax_lst[0]
-        ax.set_ylabel("One-way Delay (ms)",
+        ax.set_ylabel("OWD (ms)",
                       fontsize=font_size, fontname=font_name)
         # Add a shared x label
-        fig.text(0.5, 0.04, 'Number of chained SFIs', ha='center',
+        fig.text(0.5, 0.04, 'Chain length', ha='center',
                  fontsize=font_size, fontname=font_name)
 
-    fig.savefig('one_way_delay_%s.pdf' % mode,
+    fig.savefig('one_way_delay_%s.pdf' % mode, pad_inches=0,
                 bbox_inches='tight', dpi=400, format='pdf')
 
 

@@ -40,7 +40,8 @@ mpl.rc('font', family=font_name)
 
 ALPHA = 0.8
 
-cmap = cm.get_cmap('plasma')
+# cmap = cm.get_cmap('plasma')
+cmap = cm.get_cmap('tab10')
 
 
 def warn_three_std(value_arr, path=None):
@@ -157,12 +158,13 @@ def plot_ipd():
 
     sf_num_lst = (0, 1, 10)
 
-    colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
+    # colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
+    colors = [cmap(x) for x in range(len(sf_num_lst))]
 
-    for method in ('KF', ):
+    for method in ('LKF', ):
         label_gen = (
-            method + ', ' + appendix for appendix in ('SF_NUM = 0', 'SF_NUM = 1',
-                                                      'SF_NUM = 10'))
+            method + ' ' + appendix for appendix in ('SFI_NUM = 0', 'SFI_NUM = 1',
+                                                     'SFI_NUM = 10'))
         for sf_num, color, label in zip(
             (0, 1, 10), colors,
             label_gen,
@@ -249,12 +251,13 @@ def plot_plen():
 
     width = 0.3
 
-    suffix = ['SF_NUM = %s' % sf for sf in sf_num_lst]
-    colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
+    suffix = ['SFI_NUM = %s' % sf for sf in sf_num_lst]
+    # colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
+    colors = [cmap(x) for x in range(len(sf_num_lst))]
 
-    for mt_idx, method in enumerate(['KF']):
+    for mt_idx, method in enumerate(['LKF']):
         label_gen = (
-            method + ', ' + suf for suf in suffix)
+            method + ' ' + suf for suf in suffix)
 
         for sf_idx, label, color in zip((0, 1, 2), label_gen,
                                         # ('green', 'blue', 'red')):
@@ -507,12 +510,11 @@ def plot_three_host():
     #  Plot  #
     ##########
 
-    colors = [cmap(x * 1 / len(method_tuple))
-              for x in range(len(method_tuple))]
+    colors = [cmap(x) for x in range(len(method_tuple))]
     labels = (
-        'KF, Nova Scheduler Default',
-        'KF, Fill One',
-        'KF, NSD Reordered'
+        'LKF NSD',
+        'LKF FO',
+        'LKF NSDRD'
     )
 
     # ------ Plot Abs -------
