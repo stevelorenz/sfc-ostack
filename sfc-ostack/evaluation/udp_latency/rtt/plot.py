@@ -12,6 +12,8 @@ Email: xianglinks@gmail.com
 
 import os
 import sys
+sys.path.append('../../scripts')
+import tex
 
 import ipdb
 import numpy as np
@@ -95,7 +97,7 @@ def autolabel_bar(ax, rects):
 
 def save_fig(fig, path):
     """Save fig to path"""
-    fig.savefig(path + '.pdf',
+    fig.savefig(path + '.pdf', pad_iches=0,
                 bbox_inches='tight', dpi=400, format='pdf')
 
 
@@ -151,6 +153,8 @@ def plot_ipd():
     ##########
     #  Plot  #
     ##########
+    tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
+              params={})
 
     fig, ax = plt.subplots()
 
@@ -163,8 +167,9 @@ def plot_ipd():
 
     for method in ('LKF', ):
         label_gen = (
-            method + ' ' + appendix for appendix in ('SFI_NUM = 0', 'SFI_NUM = 1',
-                                                     'SFI_NUM = 10'))
+            method + ' ' + appendix for appendix in ('Chain Length = 0',
+                                                     'Chain Length = 1',
+                                                     'Chain Length = 10'))
         for sf_num, color, label in zip(
             (0, 1, 10), colors,
             label_gen,
@@ -172,17 +177,18 @@ def plot_ipd():
             y = lat_avg_map[sf_num]
             ax.errorbar(x, y, yerr=lat_hwci_map[sf_num], color=color, label=label,
                         marker='o', markerfacecolor='None', markeredgewidth=1, markeredgecolor=color,
+                        ecolor='red',
                         linestyle='--'
                         )
 
-    ax.set_xlabel("Inter-packet Delay (ms)",
+    ax.set_xlabel("Probing Interval (ms)",
                   fontsize=font_size, fontname=font_name)
 
     ax.axvline(x=4, ymin=0, ymax=14, ls='--', lw=0.4, color='black')
 
     ax.set_xticks((2, 3, 4, 5, 10, 20))
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
-    ax.set_ylim(0, 14)
+    ax.set_ylim(0, 16)
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, fontsize=font_size,
               loc='upper right')
@@ -247,11 +253,17 @@ def plot_plen():
     #  Plot  #
     ##########
 
+    tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
+              params={
+                  'hatch.linewidth': 0.5
+              })
+    hatch_patterns = ('xxxx', '////', '++++', '****', 'oooo', '....', '.')
+
     fig, ax = plt.subplots()
 
     width = 0.3
 
-    suffix = ['SFI_NUM = %s' % sf for sf in sf_num_lst]
+    suffix = ['Chain Length %s' % sf for sf in sf_num_lst]
     # colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
     colors = [cmap(x) for x in range(len(sf_num_lst))]
 
@@ -265,15 +277,16 @@ def plot_plen():
             pos = [0 + sf_idx * width] * len(plen_lst)
             cur_x = [sf_idx * width + x for x in range(1, 6)]
             ax.bar(cur_x, lat_avg_plen[sf_idx], yerr=lat_hwci_plen[sf_idx],
-                   error_kw=dict(elinewidth=1, ecolor='red'), alpha=ALPHA,
-                   width=width, color=color, lw=1, label=label)
+                   error_kw=dict(elinewidth=1, ecolor='red'), alpha=0.8,
+                   hatch=hatch_patterns[sf_idx],
+                   width=width, color=color, ecolor='black', lw=0.6, label=label)
 
     ax.set_xticks([x + (len(sf_num_lst) - 1) *
                    width / 2.0 for x in range(1, 6)])
     ax.set_xticklabels(plen_lst, fontsize=font_size, fontname=font_name)
     ax.set_xlabel('UDP Payload Length (bytes)')
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
-    ax.set_ylim(0, 12)
+    ax.set_ylim(0, 14)
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, fontsize=font_size,
               loc='upper right')

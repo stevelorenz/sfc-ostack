@@ -174,7 +174,9 @@ def plot_start_three_compute(inc_wait=True):
     """Plot start time results on three compute nodes"""
 
     tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
-              params={})
+              params={
+                  'hatch.linewidth': 0.5
+              })
 
     test_round = 30
 
@@ -189,16 +191,16 @@ def plot_start_three_compute(inc_wait=True):
 
     method_tuple = ('ns', 'fn', 'nsrd')
     ts_info_tuple = (
-        'SFI launching time',
-        'SFPG waiting time',
-        'SFI reordering time',
-        'PC building time'
+        'SFI launching duration',
+        'SFI booting duration',
+        # 'SFI reordering duration',
+        'PC building duration'
     )
     if not inc_wait:
         ts_info_tuple = (
-            'SFI launching time',
-            'SFI reordering time',
-            'PC building time'
+            'SFI launching duration',
+            'SFI booting duration',
+            'PC building duration'
         )
 
     base_path = './test_result/three_compute/'
@@ -220,7 +222,7 @@ def plot_start_three_compute(inc_wait=True):
                 )
             else:
                 srv_num_result.append(
-                    [np.average(ctl_data[:, x]) for x in range(0, 4)]
+                    [np.average(ctl_data[:, x]) for x in (0, 1, 3)]
                 )
 
         result_map[method] = srv_num_result
@@ -240,7 +242,8 @@ def plot_start_three_compute(inc_wait=True):
     width = 0.25
 
     x = np.arange(min_sf_num, max_sf_num + 1, 1, dtype='int32')
-    hatch_typ = [' ', '/', '.']
+    # hatch_typ = [' ', '/', '.']
+    hatch_patterns = ('xxxx', '////', '++++', 'oooo', '*', 'o', 'O', '.')
 
     # MARK: I don't know hot to plot this better...
     for m_idx, method in enumerate(method_tuple):
@@ -255,10 +258,10 @@ def plot_start_three_compute(inc_wait=True):
             for t_idx, ts in enumerate(ts_tuple):
                 rect = ax.bar(
                     srv_num + 1 + pos, ts_tuple[t_idx], width, alpha=0.8,
-                    bottom=sum(ts_tuple[0:t_idx]), lw=0.8,
+                    bottom=sum(ts_tuple[0:t_idx]), lw=0.6,
                     color=colors[t_idx], edgecolor='black',
                     label=ts_info_tuple[t_idx],
-                    # hatch=hatch_typ[m_idx]
+                    hatch=hatch_patterns[t_idx]
                 )
                 if t_idx == (len(ts_tuple) - 1):
                     autolabel_bar(ax, rect, -10, method_label_tuple[m_idx])
@@ -283,7 +286,7 @@ def plot_start_three_compute(inc_wait=True):
     # ax.set_xlim(0, 11)
 
     ax.set_ylabel("Rendering duration (s)")
-    ax.set_ylim(0, 320)
+    ax.set_ylim(0, 340)
 
     # ax.grid(linestyle='--', lw=0.5)
     ax.yaxis.grid(which='major', lw=0.5, ls='--')
@@ -366,13 +369,16 @@ def plot_gap_three_compute():
     ##########
     #  Plot  #
     ##########
-
     tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
-              params={})
+              params={
+                  'hatch.linewidth': 0.5
+              })
 
     method_label_tuple = ('LB',
                           'LC',
                           'LBLC')
+
+    hatch_patterns = ('xxxx', '////', '++++', '*', 'o', 'O', '.')
 
     fig, ax = plt.subplots()
     width = 0.25
@@ -385,8 +391,10 @@ def plot_gap_three_compute():
         x = [pos + x for x in range(min_sf_num, max_sf_num + 1)]
         ax.bar(
             x, gt_lst, width, alpha=0.8,
-            color=colors[m_idx], edgecolor=colors[m_idx],
-            label=method_label_tuple[m_idx]
+            color=colors[m_idx], edgecolor='black',
+            label=method_label_tuple[m_idx],
+            hatch=hatch_patterns[m_idx],
+            lw=0.6
         )
 
     handles, labels = ax.get_legend_handles_labels()

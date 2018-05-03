@@ -231,7 +231,10 @@ def plot_udp_owd(mode='l'):
     ##########
 
     tex.setup(width=1, height=None, span=False, l=0.15, r=0.98, t=0.98, b=0.17,
-              params={})
+              params={
+                  'hatch.linewidth': 0.5
+              })
+    hatch_patterns = ('xxxx', '////', '++++', '*', 'o', 'O', '.')
 
     width = 0.25
     label_map = {
@@ -263,9 +266,12 @@ def plot_udp_owd(mode='l'):
                 x, avg_lst, width, alpha=ALPHA,
                 yerr=err_lst,
                 color=cmap_lst[sf_idx](all_idx),
-                edgecolor=cmap_lst[sf_idx](all_idx),
+                edgecolor='black',
+                lw=0.6,
+                # edgecolor=cmap_lst[sf_idx](all_idx),
                 label=label_map[cur_mt],
-                error_kw=dict(elinewidth=1, ecolor='red')
+                error_kw=dict(elinewidth=0.8, ecolor='red'),
+                hatch=hatch_patterns[all_idx]
             )
     if mode != 'as':
         ax = ax_lst[0]
