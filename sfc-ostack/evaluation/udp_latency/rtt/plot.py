@@ -181,7 +181,7 @@ def plot_ipd():
                         linestyle='--'
                         )
 
-    ax.set_xlabel("Probing Interval (ms)",
+    ax.set_xlabel("Probing interval (ms)",
                   fontsize=font_size, fontname=font_name)
 
     ax.axvline(x=4, ymin=0, ymax=14, ls='--', lw=0.4, color='black')
@@ -263,7 +263,7 @@ def plot_plen():
 
     width = 0.3
 
-    suffix = ['Chain Length %s' % sf for sf in sf_num_lst]
+    suffix = ['Chain Length = %s' % sf for sf in sf_num_lst]
     # colors = [cmap(x * 1 / len(sf_num_lst)) for x in range(len(sf_num_lst))]
     colors = [cmap(x) for x in range(len(sf_num_lst))]
 
@@ -284,7 +284,7 @@ def plot_plen():
     ax.set_xticks([x + (len(sf_num_lst) - 1) *
                    width / 2.0 for x in range(1, 6)])
     ax.set_xticklabels(plen_lst, fontsize=font_size, fontname=font_name)
-    ax.set_xlabel('UDP Payload Length (bytes)')
+    ax.set_xlabel('UDP payload size (bytes)')
     ax.set_ylabel("RTT (ms)", fontsize=font_size, fontname=font_name)
     ax.set_ylim(0, 14)
     handles, labels = ax.get_legend_handles_labels()

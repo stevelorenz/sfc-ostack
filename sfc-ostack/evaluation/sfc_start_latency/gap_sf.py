@@ -190,8 +190,8 @@ def forwards_forward(recv_sock, send_sock):
                     'After appending time stamp, pack_len: %d', pack_len
                 )
 
-        pack_arr[0:MAC_LEN] = DST_MAC_B
-        send_sock.send(pack_arr[0:pack_len])
+                pack_arr[0:MAC_LEN] = DST_MAC_B
+                send_sock.send(pack_arr[0:pack_len])
 
 
 def backwards_forward(recv_sock, send_sock):
